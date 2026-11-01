@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f5fa8">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Viáticos Heartland</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--tx:#1d1d1b;--tx2:#6b6a66;--tx3:#9b9a95;--bd:#e3e1db;--ac:#1f5fa8;--acbg:#e6f0fb;--ok:#2f6b11;--okbg:#eaf3de;--warn:#7a4a06;--warnbg:#fbefd9;--err:#a32d2d;--errbg:#fcebeb}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1b1a;--card:#262624;--tx:#f0efe9;--tx2:#b4b2a9;--tx3:#888780;--bd:#3a3936;--ac:#85b7eb;--acbg:#0c2c4f;--ok:#c0dd97;--okbg:#22380e;--warn:#fac775;--warnbg:#412402;--err:#f09595;--errbg:#501313}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.45}
+.wrap{max-width:560px;margin:0 auto;padding:12px 14px 40px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 12px}
+h1{font-size:19px;font-weight:600;margin:0}
+.mes{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--tx2)}
+input,select,button{font:inherit;color:inherit}
+input[type=text],input[type=number],input[type=date],input[type=month],select{width:100%;height:40px;padding:0 10px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
+.mes input{width:auto;height:34px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:4px;margin-bottom:14px}
+.tabs button{border:0;background:none;padding:8px 4px;border-radius:7px;font-size:14px;color:var(--tx2);cursor:pointer}
+.tabs button.on{background:var(--acbg);color:var(--ac);font-weight:600}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:150px;border:1.5px dashed var(--bd);border-radius:10px;color:var(--tx2);cursor:pointer;text-align:center;padding:10px;overflow:hidden}
+.pick{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}.pk{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 6px;border:1px solid var(--bd);border-radius:10px;background:var(--card);cursor:pointer;font-size:14px}
+.drop img{max-width:100%;max-height:260px;border-radius:6px}
+.lbl{font-size:12px;color:var(--tx2);margin:12px 0 5px;display:block}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:7px 11px;border:1px solid var(--bd);border-radius:8px;background:var(--card);font-size:13px;cursor:pointer}
+.chip.on{background:var(--acbg);border-color:var(--ac);color:var(--ac);font-weight:600}
+.btn{display:block;width:100%;height:44px;border-radius:9px;border:1px solid var(--bd);background:var(--card);cursor:pointer;font-weight:600;margin-top:14px}
+.btn.pri{background:var(--ac);border-color:var(--ac);color:#fff}
+@media (prefers-color-scheme:dark){.btn.pri{color:#042c53}}
+.btn:disabled{opacity:.55;cursor:default}
+.small{font-size:12px;color:var(--tx2)}
+.note{font-size:13px;padding:8px 10px;border-radius:8px;margin-top:10px}
+.note.ok{background:var(--okbg);color:var(--ok)}.note.warn{background:var(--warnbg);color:var(--warn)}.note.err{background:var(--errbg);color:var(--err)}.note.info{background:var(--acbg);color:var(--ac)}
+.total{background:var(--bg);border-radius:10px;padding:12px;margin-bottom:10px}
+.total b{display:block;font-size:24px;font-weight:600}
+.grp{border-top:1px solid var(--bd)}
+.grp:first-of-type{border-top:0}
+.grph{display:flex;justify-content:space-between;align-items:center;padding:11px 2px;cursor:pointer}
+.grph span.n{color:var(--tx3);font-size:13px}
+.tk{display:flex;gap:10px;align-items:center;padding:8px 2px 8px 6px;border-top:1px dashed var(--bd)}
+.tk img{width:44px;height:44px;object-fit:cover;border-radius:6px;background:var(--bg);flex:none;cursor:zoom-in}
+.tk .i{flex:1;min-width:0;font-size:13px}
+.tk .i div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib{border:1px solid var(--bd);background:var(--card);border-radius:7px;height:32px;padding:0 9px;font-size:12px;cursor:pointer}
+.ib.del{color:var(--err)}
+.file{display:flex;gap:10px;align-items:center;border:1px solid var(--bd);border-radius:10px;padding:10px;margin-top:10px}
+.file .i{flex:1;font-size:13px}
+.empty{text-align:center;color:var(--tx2);padding:18px 6px}
+.hide{display:none!important}
+.nologin #tabs,.nologin section,.nologin #boot,.nologin #calBanner{display:none!important}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9;padding:16px}
+.overlay img{max-width:100%;max-height:100%;border-radius:8px}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Viáticos <button id="btnSalir" class="ib hide" style="margin-left:6px;vertical-align:2px">Salir</button></h1>
+    <label class="mes">Mes a rendir <input type="month" id="mes"></label>
+  </header>
+  <div id="login" class="card hide" style="text-align:center;padding:28px 16px">
+    <div style="font-size:34px">🧾</div>
+    <p style="font-weight:600;margin:6px 0">Viáticos Heartland</p>
+    <p class="small">Entrá con tu cuenta de Google para ver y cargar tus tickets.</p>
+    <button class="btn pri" id="btnLogin">Entrar con Google</button>
+    <p class="small" id="loginMsg" style="color:var(--err)"></p>
+  </div>
+  <div id="boot" class="note info"><span class="spin"></span>Conectando…</div>
+  <div id="fatal" class="note err hide"></div>
+
+  <div id="calBanner" class="note hide" style="margin:0 0 12px"></div>
+  <nav class="tabs" id="tabs">
+    <button data-v="cargar" class="on">Cargar</button>
+    <button data-v="mes">Mi mes</button>
+    <button data-v="cerrar">Cerrar mes</button>
+  </nav>
+
+  <!-- CARGAR -->
+  <section id="v-cargar">
+    <div class="card">
+      <div id="editBanner" class="note info hide" style="margin:0 0 10px">Editando ticket · <a href="#" id="cancelEdit">cancelar</a></div>
+      <input type="file" id="foto" accept="image/*" capture="environment" class="hide">
+      <input type="file" id="fotoGal" accept="image/*" class="hide">
+      <div class="drop" id="drop">
+        <span id="dropTxt" class="pick">
+          <button type="button" class="pk" id="btnCam"><span style="font-size:26px">📷</span>Sacar foto</button>
+          <button type="button" class="pk" id="btnGal"><span style="font-size:26px">🖼️</span>Subir de la galería</button>
+        </span>
+        <img id="preview" class="hide" alt="Ticket">
+      </div>
+      <button type="button" class="ib hide" id="otraFoto" style="margin-top:8px">Cambiar foto</button>
+      <div id="readNote" class="note hide"></div>
+
+      <div class="row2">
+        <div><span class="lbl">Fecha</span><input type="date" id="fFecha"></div>
+        <div><span class="lbl">Importe total ($)</span><input type="text" inputmode="decimal" id="fImporte" placeholder="98450,00"></div>
+      </div>
+      <span class="lbl">Proveedor / lugar</span><input type="text" id="fProv" placeholder="YPF Ruta 2">
+      <span class="lbl">Concepto</span>
+      <div class="chips" id="chips"></div>
+      <div id="formErr" class="note err hide"></div>
+      <button class="btn pri" id="guardar">Guardar ticket</button>
+    </div>
+    <p class="small" id="lastSaved"></p>
+  </section>
+
+  <!-- MI MES -->
+  <section id="v-mes" class="hide">
+    <div class="card">
+      <div class="total"><span class="small" id="totLbl">Total a rendir</span><b id="totVal">$ 0,00</b></div>
+      <div id="grupos"></div>
+    </div>
+  </section>
+
+  <!-- CERRAR -->
+  <section id="v-cerrar" class="hide">
+    <div class="card">
+      <span class="lbl" style="margin-top:0">Colaborador</span><input type="text" id="cColab">
+      <span class="lbl">Motivo del gasto (el mes se agrega solo)</span><input type="text" id="cMotivo">
+      <div class="small" style="margin-top:4px">Va a quedar: <b id="motivoPrev"></b></div>
+      <span class="lbl">Centro de costos</span>
+      <select id="cCeco"></select>
+      <div id="alertas"></div>
+      <div id="calLista" class="small" style="margin-top:12px"></div>
+      <div class="file"><span style="font-size:22px">📊</span><div class="i"><div id="nXlsx">—</div><div class="small">Reporte con una fila por grupo + detalle de tickets</div></div></div>
+      <button class="btn pri" id="dlXlsx">Descargar Excel</button>
+      <div class="file"><span style="font-size:22px">📄</span><div class="i"><div id="nDocx">—</div><div class="small">Una página por grupo con las fotos de sus tickets</div></div></div>
+      <button class="btn" id="dlDocx">Descargar Word</button>
+      <div id="dlNote" class="note hide"></div>
+      <details style="margin-top:16px"><summary class="small" style="cursor:pointer">Respaldo de datos</summary>
+        <p class="small">Baja o carga todos tus tickets con fotos (por ejemplo, para pasarlos a otra versión de la app).</p>
+        <button class="btn" id="btnExport">Exportar todo</button>
+        <input type="file" id="fileImport" accept=".json,application/json" class="hide">
+        <button class="btn" id="btnImport">Importar respaldo</button>
+        <div id="bkNote" class="note hide"></div>
+      </details>
+    </div>
+  </section>
+</div>
+<div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
+
+<script src="fb.bundle.js"></script>
+<script src="shim.js"></script>
+<script src="builders.js"></script>
+<script>
+var B = window.Builders;
+var CECOS = ['12 – Executive','11 - Legal ','13 – HR','15 - Plant Controller','16 – Accounting','17 - IT','18 -  Sales','26 - R&D','27 - Regulatory','28 – Brand Marketing','30 – General Plant','31 – Sweetener (Cloud)','40 – Indirect General','41 – Quality'];
+var $ = function (id) { return document.getElementById(id); };
+var S = { db: null, assets: null, sample: null, downloads: null, uid: null, cfgRef: null, tkCol: null,
+  tickets: [], cfg: {}, view: 'cargar', grupo: null, blob: null, dims: null, editId: null, open: {}, readCtl: null };
+
+function hoyMes() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function parseImporte(s) {
+  s = String(s || '').replace(/[^\d.,-]/g, '');
+  if (!s) return NaN;
+  if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+  else if ((s.match(/\./g) || []).length > 1 || /\.\d{3}$/.test(s)) s = s.replace(/\./g, '');
+  return Number(s);
+}
+function fmtImporte(n) { return (Number(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function note(el, cls, html) { el.className = 'note ' + cls; el.innerHTML = html; el.classList.remove('hide'); }
+function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+function mesActual() { return $('mes').value || hoyMes(); }
+function ticketsMes() { var m = mesActual(); return S.tickets.filter(function (t) { return t.mes === m; }); }
+function imgUrl(t) { return t.assetId ? '/_blob/' + t.assetId : ''; }
+function fotoDe(t) { return window.Fotos ? window.Fotos.get(t.assetId) : Promise.resolve(imgUrl(t)); }
+
+/* ---------- tabs ---------- */
+$('tabs').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return; setView(b.dataset.v);
+});
+function setView(v) {
+  S.view = v;
+  [].forEach.call($('tabs').children, function (b) { b.classList.toggle('on', b.dataset.v === v); });
+  ['cargar', 'mes', 'cerrar'].forEach(function (x) { $('v-' + x).classList.toggle('hide', x !== v); });
+  render();
+}
+
+/* ---------- chips ---------- */
+function renderChips() {
+  $('chips').innerHTML = '';
+  B.GRUPOS.forEach(function (g) {
+    var c = document.createElement('button'); c.type = 'button'; c.className = 'chip' + (S.grupo === g.id ? ' on' : '');
+    c.textContent = g.label; c.onclick = function () { S.grupo = g.id; renderChips(); $('formErr').classList.add('hide'); };
+    $('chips').appendChild(c);
+  });
+}
+
+/* ---------- foto ---------- */
+async function prepararImagen(file) {
+  var bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (e) { bmp = await new Promise(function (res, rej) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = rej; i.src = URL.createObjectURL(file); }); }
+  var w = bmp.width, h = bmp.height, max = 1600, sc = Math.min(1, max / Math.max(w, h));
+  var cv = document.createElement('canvas'); cv.width = Math.round(w * sc); cv.height = Math.round(h * sc);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  var blob = await new Promise(function (r) { cv.toBlob(r, 'image/jpeg', 0.82); });
+  return { blob: blob, w: cv.width, h: cv.height };
+}
+async function onFoto() {
+  var f = this.files && this.files[0]; this.value = ''; if (!f) return;
+  try {
+    var p = await prepararImagen(f);
+    S.blob = p.blob; S.dims = { w: p.w, h: p.h };
+    $('preview').src = URL.createObjectURL(p.blob); $('preview').classList.remove('hide'); $('dropTxt').classList.add('hide');
+    leerTicket();
+    $('otraFoto').classList.remove('hide');
+  } catch (e) { note($('readNote'), 'err', 'No pude abrir esa imagen. Probá con otra foto.'); }
+}
+$('foto').addEventListener('change', onFoto);
+$('fotoGal').addEventListener('change', onFoto);
+$('btnCam').onclick = function () { $('foto').click(); };
+$('btnGal').onclick = function () { $('fotoGal').click(); };
+$('otraFoto').onclick = function () { $('preview').classList.add('hide'); $('dropTxt').classList.remove('hide'); this.classList.add('hide'); };
+
+async function leerTicket() {
+  if (!S.sample || !S.blob) { if (!S.sample) note($('readNote'), 'info', 'Completá los datos a mano.'); return; }
+  if (S.readCtl) S.readCtl.abort();
+  var ctl = S.readCtl = new AbortController();
+  note($('readNote'), 'info', '<span class="spin"></span>Leyendo el ticket…');
+  var lista = B.GRUPOS.map(function (g) { return g.id; }).join(', ');
+  var prompt = 'La imagen es un ticket, factura o comprobante de pago argentino (o captura de un pago, p. ej. TelePASE/peaje, estacionamiento, combustible, comida). ' +
+    'Extraé los datos. Los importes usan formato argentino: punto para miles y coma para decimales ("98.450,00" = 98450.00). ' +
+    'El importe es el TOTAL pagado (si hay varios movimientos, la suma de todos). ' +
+    'Respondé SOLO con un objeto JSON: {"fecha":"YYYY-MM-DD" o null,"proveedor":"nombre corto del comercio/lugar" o null,"importe":número o null,"grupo":uno de [' + lista + '] o null}. ' +
+    'Ejemplo: {"fecha":"2026-10-14","proveedor":"YPF","importe":98450,"grupo":"COMBUSTIBLE"}';
+  try {
+    var r = await S.sample.json(prompt, { images: [S.blob], signal: ctl.signal });
+    if (ctl.signal.aborted) return;
+    var leidos = [];
+    var libre = function (id) { return !$(id).dataset.touched; };
+    if (r && r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) { leidos.push('fecha'); if (libre('fFecha')) $('fFecha').value = r.fecha; }
+    if (r && r.proveedor) { leidos.push('proveedor'); if (libre('fProv')) $('fProv').value = String(r.proveedor).slice(0, 80); }
+    if (r && r.importe != null && !isNaN(Number(r.importe))) { leidos.push('importe'); if (libre('fImporte')) $('fImporte').value = fmtImporte(r.importe); }
+    if (r && r.grupo && B.GRUPOS.some(function (g) { return g.id === r.grupo; }) && !S.grupo) { S.grupo = r.grupo; renderChips(); }
+    if (leidos.length) note($('readNote'), 'ok', '✓ Leído del ticket (' + leidos.join(', ') + '). Revisá que esté bien antes de guardar.');
+    else note($('readNote'), 'warn', 'No pude leer los datos. Completalos a mano.');
+  } catch (e) {
+    if (e && e.code === 'cancelled') return;
+    var m = { not_granted: 'Sin permiso para leer tickets automáticamente. Completá a mano.', rate_limited: 'Demasiadas lecturas seguidas. Esperá un momento o completá a mano.',
+      image_rejected: 'La imagen no se pudo leer. Probá con otra foto.', images_unavailable: 'La lectura automática no está disponible acá. Completá a mano.' };
+    note($('readNote'), 'warn', (m[e && e.code] || 'No pude leer el ticket. Completá los datos a mano.') +
+      (e && (e.code === 'upstream_error' || e.code === 'invalid_json') ? ' <a href="#" id="retryRead">Reintentar</a>' : ''));
+    var rr = $('retryRead'); if (rr) rr.onclick = function (ev) { ev.preventDefault(); leerTicket(); };
+    if (e && (e.code === 'not_granted' || e.code === 'images_unavailable' || e.code === 'sampling_disabled')) S.sample = null;
+  }
+}
+
+/* ---------- guardar ---------- */
+function resetForm() {
+  S.blob = null; S.dims = null; S.editId = null; S.grupo = null;
+  if (S.readCtl) S.readCtl.abort();
+  $('preview').classList.add('hide'); $('preview').removeAttribute('src'); $('dropTxt').classList.remove('hide'); $('otraFoto').classList.add('hide');
+  ['fFecha', 'fImporte', 'fProv'].forEach(function (id) { $(id).value = ''; delete $(id).dataset.touched; });
+  ['readNote', 'formErr', 'editBanner'].forEach(function (id) { $(id).classList.add('hide'); });
+  $('guardar').textContent = 'Guardar ticket';
+  renderChips();
+}
+['fFecha', 'fImporte', 'fProv'].forEach(function (id) { $(id).addEventListener('input', function () { this.dataset.touched = '1'; }); });
+$('cancelEdit').onclick = function (e) { e.preventDefault(); resetForm(); };
+
+$('guardar').addEventListener('click', async function () {
+  var imp = parseImporte($('fImporte').value), fecha = $('fFecha').value;
+  var err = !S.blob && !S.editId ? 'Sacá o subí la foto del ticket.' : !fecha ? 'Falta la fecha.' : !(imp > 0) ? 'Falta el importe (ej: 98450,00).' : !S.grupo ? 'Elegí el concepto.' : '';
+  if (err) { note($('formErr'), 'err', err); return; }
+  if (!S.tkCol) { note($('formErr'), 'err', 'No hay conexión con tu almacenamiento. Recargá la página.'); return; }
+  var btn = this; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Guardando…';
+  try {
+    var data = { fecha: fecha, importe: B.round2(imp), proveedor: $('fProv').value.trim(), grupo: S.grupo };
+    if (S.editId) {
+      var old = S.tickets.filter(function (t) { return t.id === S.editId; })[0] || {};
+      var upd = Object.assign({}, data);
+      if (S.blob) { var a2 = await S.assets.upload(S.blob); upd.assetId = a2.id; upd.w = S.dims.w; upd.h = S.dims.h; }
+      await S.tkCol.doc(S.editId).update(upd);
+      if (S.blob && old.assetId) S.assets.delete(old.assetId).catch(function () {});
+      $('lastSaved').textContent = 'Ticket actualizado.';
+    } else {
+      var a = await S.assets.upload(S.blob);
+      data.assetId = a.id; data.w = S.dims.w; data.h = S.dims.h; data.mes = mesActual(); data.creado = new Date().toISOString();
+      await S.tkCol.add(data);
+      $('lastSaved').textContent = 'Guardado: ' + B.grupoDe(data.grupo).label + ' · $ ' + fmtImporte(data.importe) + '. Podés cargar el siguiente.';
+    }
+    resetForm();
+  } catch (e) {
+    note($('formErr'), 'err', e && e.code === 'quota_exceeded' ? 'Se llenó el espacio de almacenamiento. Borrá tickets de meses viejos.' : 'No se pudo guardar. Probá de nuevo.');
+  } finally { btn.disabled = false; if (!S.editId) btn.textContent = 'Guardar ticket'; else btn.textContent = 'Guardar cambios'; }
+});
+
+/* ---------- mi mes ---------- */
+function renderMes() {
+  var ts = ticketsMes(), gs = B.agrupar(ts);
+  var tot = gs.reduce(function (s, g) { return s + g.total; }, 0);
+  var p = mesActual().split('-');
+  $('totLbl').textContent = 'Total a rendir · ' + B.MESES_LARGO[Number(p[1]) - 1] + ' ' + p[0] + ' · ' + ts.length + (ts.length === 1 ? ' ticket' : ' tickets');
+  $('totVal').textContent = B.money(tot);
+  var box = $('grupos'); box.innerHTML = '';
+  if (!gs.length) { box.innerHTML = '<div class="empty">Todavía no cargaste tickets en este mes.</div>'; return; }
+  gs.forEach(function (gr) {
+    var d = document.createElement('div'); d.className = 'grp';
+    var open = !!S.open[gr.grupo.id];
+    d.innerHTML = '<div class="grph"><span>' + esc(gr.grupo.label) + ' <span class="n">· ' + gr.tickets.length + '</span></span><span>' + B.money(gr.total) + ' ' + (open ? '▴' : '▾') + '</span></div>';
+    d.firstChild.onclick = function () { S.open[gr.grupo.id] = !open; renderMes(); };
+    if (open) gr.tickets.forEach(function (t) {
+      var r = document.createElement('div'); r.className = 'tk';
+      r.innerHTML = '<img alt="">' +
+        '<div class="i"><div>' + esc(B.fechaAR(t.fecha)) + ' · ' + esc(t.proveedor || 'Sin proveedor') + '</div><div><b>' + B.money(t.importe) + '</b></div></div>' +
+        '<button class="ib">Editar</button><button class="ib del">Borrar</button>';
+      if (t.assetId) fotoDe(t).then(function (u) { if (u) r.querySelector('img').src = u; });
+      r.querySelector('img').onclick = function () { if (t.assetId) fotoDe(t).then(function (u) { $('ovImg').src = u; $('overlay').classList.remove('hide'); }); };
+      r.querySelectorAll('button')[0].onclick = function () { editar(t); };
+      var del = r.querySelectorAll('button')[1];
+      del.onclick = async function () {
+        if (del.dataset.c !== '1') { del.dataset.c = '1'; del.textContent = '¿Seguro?'; setTimeout(function () { del.dataset.c = ''; del.textContent = 'Borrar'; }, 3500); return; }
+        del.disabled = true;
+        try { await S.tkCol.doc(t.id).delete(); if (t.assetId) S.assets.delete(t.assetId).catch(function () {}); }
+        catch (e) { del.disabled = false; del.textContent = 'Error'; }
+      };
+      d.appendChild(r);
+    });
+    box.appendChild(d);
+  });
+}
+$('overlay').onclick = function () { this.classList.add('hide'); };
+function editar(t) {
+  resetForm(); S.editId = t.id; S.grupo = t.grupo;
+  $('fFecha').value = t.fecha || ''; $('fImporte').value = fmtImporte(t.importe); $('fProv').value = t.proveedor || '';
+  if (t.assetId) { fotoDe(t).then(function (u) { $('preview').src = u; }); $('preview').classList.remove('hide'); $('dropTxt').classList.add('hide'); $('otraFoto').classList.remove('hide'); }
+  $('editBanner').classList.remove('hide'); $('guardar').textContent = 'Guardar cambios';
+  renderChips(); setView('cargar'); window.scrollTo(0, 0);
+}
+
+/* ---------- cerrar ---------- */
+function motivoCompleto() {
+  var p = mesActual().split('-');
+  return ($('cMotivo').value.trim() + ' ' + B.MESES_LARGO[Number(p[1]) - 1].toUpperCase() + ' ' + p[0].slice(2)).trim();
+}
+function renderCerrar() {
+  $('motivoPrev').textContent = motivoCompleto();
+  var m = mesActual(), ts = ticketsMes(), al = [];
+  $('nXlsx').textContent = B.nombreArchivo(m, 'xlsx'); $('nDocx').textContent = B.nombreArchivo(m, 'docx');
+  if (!ts.length) al.push(['warn', 'No hay tickets cargados en este mes.']);
+  var fuera = ts.filter(function (t) { return t.fecha && t.fecha.slice(0, 7) !== m; });
+  if (fuera.length) al.push(['warn', fuera.length + (fuera.length === 1 ? ' ticket tiene' : ' tickets tienen') + ' fecha fuera del mes: ' + fuera.map(function (t) { return B.fechaAR(t.fecha) + ' (' + B.money(t.importe) + ')'; }).join(', ')]);
+  var vistos = {}, dup = [];
+  ts.forEach(function (t) { var k = t.fecha + '|' + B.round2(t.importe); if (vistos[k]) dup.push(t); vistos[k] = 1; });
+  if (dup.length) al.push(['warn', 'Posible ticket repetido: ' + dup.map(function (t) { return B.fechaAR(t.fecha) + ' ' + B.money(t.importe); }).join(', ') + '. Revisalo en "Mi mes".']);
+  if (ts.length && !al.length) al.push(['ok', '✓ ' + ts.length + ' tickets sin alertas. Total ' + B.money(ts.reduce(function (s, t) { return s + (Number(t.importe) || 0); }, 0))]);
+  $('alertas').innerHTML = al.map(function (a) { return '<div class="note ' + a[0] + '">' + esc(a[1]) + '</div>'; }).join('');
+  var canDl = !!S.downloads && ts.length > 0;
+  $('dlXlsx').disabled = !canDl; $('dlDocx').disabled = !canDl;
+  if (!S.downloads) note($('dlNote'), 'warn', 'Las descargas no están disponibles en esta vista. Probá desde otro navegador.');
+}
+var cfgTimer = null;
+function guardarCfg() {
+  clearTimeout(cfgTimer);
+  cfgTimer = setTimeout(function () {
+    if (!S.cfgRef) return;
+    var c = { colaborador: $('cColab').value.trim(), motivoBase: $('cMotivo').value.trim(), ceco: $('cCeco').value, mes: mesActual() };
+    if (JSON.stringify(c) === JSON.stringify(S.cfg)) return;
+    S.cfg = c; S.cfgRef.set(c).catch(function () {});
+  }, 700);
+}
+['cColab', 'cMotivo'].forEach(function (id) { $(id).addEventListener('input', guardarCfg); });
+$('cMotivo').addEventListener('input', function () { $('motivoPrev').textContent = motivoCompleto(); });
+$('cCeco').addEventListener('change', guardarCfg);
+$('mes').addEventListener('change', function () { guardarCfg(); render(); });
+
+function datosExport() {
+  return { tickets: ticketsMes().map(function (t) { return Object.assign({}, t); }), colaborador: $('cColab').value.trim(), motivo: motivoCompleto(), ceco: $('cCeco').value };
+}
+async function guardarArchivo(btn, nombre, crear) {
+  var txt = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Armando archivo…';
+  $('dlNote').classList.add('hide');
+  try {
+    var data = await crear();
+    await S.downloads.save({ filename: nombre, data: data });
+    note($('dlNote'), 'ok', '✓ ' + esc(nombre) + ' descargado.');
+  } catch (e) {
+    if (e && e.code === 'declined') note($('dlNote'), 'info', 'Descarga cancelada.');
+    else note($('dlNote'), 'err', 'No se pudo generar el archivo' + (e && e.message ? ': ' + esc(e.message) : '') + '.');
+  } finally { btn.disabled = false; btn.textContent = txt; }
+}
+$('dlXlsx').onclick = function () {
+  guardarArchivo(this, B.nombreArchivo(mesActual(), 'xlsx'), async function () {
+    if (!window.PLANTILLA_B64) throw new Error('no se cargó la plantilla');
+    var bin = atob(window.PLANTILLA_B64), tpl = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) tpl[i] = bin.charCodeAt(i);
+    var buf = await B.buildXlsx(ExcelJS, tpl.buffer, datosExport());
+    return new Blob([buf]);
+  });
+};
+function blobToDataURL(b) { return new Promise(function (res, rej) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = rej; fr.readAsDataURL(b); }); }
+$('dlDocx').onclick = function () {
+  guardarArchivo(this, B.nombreArchivo(mesActual(), 'docx'), async function () {
+    var d = datosExport(), imgs = {};
+    d.mes = mesActual();
+    for (var i = 0; i < d.tickets.length; i++) {
+      var t = d.tickets[i]; if (!t.assetId) continue;
+      try {
+        var src = await fotoDe(t); if (!src) continue;
+        var r = await fetch(src); if (!r.ok) continue;
+        var bl = await r.blob();
+        imgs[t.id] = { buf: new Uint8Array(await bl.arrayBuffer()), type: /png/.test(bl.type) ? 'png' : 'jpg', w: t.w || 3, h: t.h || 4 };
+      } catch (e) {}
+    }
+    return await B.buildDocx(docx, d, imgs);
+  });
+};
+
+
+/* ---------- calendario de reembolsos Heartland ARG 2026: [último día de carga, envío a Tesorería, pago] ---------- */
+var CICLOS = [["2026-01-09", "2026-01-15", "2026-01-16"], ["2026-01-23", "2026-01-27", "2026-01-28"], ["2026-02-06", "2026-02-11", "2026-02-12"], ["2026-02-20", "2026-02-24", "2026-02-25"], ["2026-03-06", "2026-03-11", "2026-03-12"], ["2026-03-20", "2026-03-25", "2026-03-26"], ["2026-04-10", "2026-04-16", "2026-04-17"], ["2026-04-24", "2026-04-28", "2026-04-29"], ["2026-05-08", "2026-05-14", "2026-05-15"], ["2026-05-22", "2026-05-27", "2026-05-28"], ["2026-06-05", "2026-06-10", "2026-06-11"], ["2026-06-19", "2026-06-24", "2026-06-25"], ["2026-07-10", "2026-07-15", "2026-07-16"], ["2026-07-24", "2026-07-28", "2026-07-29"], ["2026-08-07", "2026-08-12", "2026-08-13"], ["2026-08-21", "2026-08-27", "2026-08-28"], ["2026-09-07", "2026-09-09", "2026-09-10"], ["2026-09-18", "2026-09-23", "2026-09-24"], ["2026-10-09", "2026-10-14", "2026-10-15"], ["2026-10-26", "2026-10-28", "2026-10-29"], ["2026-11-09", "2026-11-11", "2026-11-12"], ["2026-11-20", "2026-11-25", "2026-11-26"], ["2026-12-14", "2026-12-16", "2026-12-17"]];
+var FERIADOS = ['2026-09-21', '2026-10-12', '2026-11-23', '2026-12-07', '2026-12-08', '2026-12-25'];
+var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+function hoyISO() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function diasEntre(a, b) { return Math.round((Date.UTC.apply(null, b.split('-').map(function (x, i) { return i === 1 ? x - 1 : +x; })) - Date.UTC.apply(null, a.split('-').map(function (x, i) { return i === 1 ? x - 1 : +x; }))) / 86400000); }
+function fCorta(iso) { var p = iso.split('-').map(Number); var d = new Date(p[0], p[1] - 1, p[2]); return DIAS[d.getDay()] + ' ' + p[2] + '/' + p[1]; }
+function proximosCiclos() { var h = hoyISO(); return CICLOS.filter(function (c) { return c[0] >= h; }); }
+function renderCalendario() {
+  var prox = proximosCiclos(), b = $('calBanner');
+  if (!prox.length) { note(b, 'info', 'No tengo fechas de reembolso para 2027. Pasale el calendario nuevo a Claude para actualizarlo.'); }
+  else {
+    var c = prox[0], n = diasEntre(hoyISO(), c[0]);
+    var cuando = n === 0 ? '<b>hoy</b>' : n === 1 ? '<b>mañana</b>' : 'en <b>' + n + ' días</b>';
+    note(b, n <= 2 ? 'warn' : 'info', '📅 Último día para cargar reembolsos: <b>' + fCorta(c[0]) + '</b> (' + cuando + '). Pago: ' + fCorta(c[2]) + '.');
+  }
+  $('calLista').innerHTML = prox.length ? '<b>Próximas fechas</b><br>' + prox.slice(0, 4).map(function (c) { return 'Cargar hasta ' + fCorta(c[0]) + ' → envío a Tesorería ' + fCorta(c[1]) + ' → pago ' + fCorta(c[2]); }).join('<br>') +
+    (FERIADOS.filter(function (f) { return f >= hoyISO(); }).length ? '<br>Feriados: ' + FERIADOS.filter(function (f) { return f >= hoyISO(); }).map(fCorta).join(', ') : '') : '';
+}
+
+
+/* ---------- respaldo: exportar / importar ---------- */
+$('btnExport').onclick = async function () {
+  var btn = this, txt = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Preparando…';
+  try {
+    var out = { app: 'viaticos-heartland', version: 1, exportado: new Date().toISOString(), config: S.cfg || {}, tickets: [] };
+    for (var i = 0; i < S.tickets.length; i++) {
+      var t = Object.assign({}, S.tickets[i]), foto = '';
+      if (t.assetId) {
+        try { var src = await fotoDe(t); if (src && src.indexOf('data:') !== 0) { var r = await fetch(src); if (r.ok) src = await new Promise(function (res) { r.blob().then(function (b) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.readAsDataURL(b); }); }); } foto = src || ''; } catch (e) {}
+      }
+      delete t.assetId; t.foto = foto; out.tickets.push(t);
+    }
+    await S.downloads.save({ filename: 'viaticos-respaldo-' + new Date().toISOString().slice(0, 10) + '.json', data: JSON.stringify(out) });
+    note($('bkNote'), 'ok', '✓ Respaldo descargado: ' + out.tickets.length + ' tickets.');
+  } catch (e) { note($('bkNote'), e && e.code === 'declined' ? 'info' : 'err', e && e.code === 'declined' ? 'Descarga cancelada.' : 'No se pudo exportar.'); }
+  finally { btn.disabled = false; btn.textContent = txt; }
+};
+$('btnImport').onclick = function () { $('fileImport').click(); };
+$('fileImport').addEventListener('change', async function () {
+  var f = this.files && this.files[0]; this.value = ''; if (!f) return;
+  try {
+    var data = JSON.parse(await f.text());
+    if (!data || data.app !== 'viaticos-heartland' || !Array.isArray(data.tickets)) throw new Error('formato');
+    var ya = {}; S.tickets.forEach(function (t) { ya[t.id] = 1; });
+    var n = 0, saltados = 0;
+    for (var i = 0; i < data.tickets.length; i++) {
+      var t = Object.assign({}, data.tickets[i]), id = t.id, foto = t.foto;
+      delete t.id; delete t.foto;
+      if (!id || ya[id]) { saltados++; continue; }
+      note($('bkNote'), 'info', '<span class="spin"></span>Importando ' + (i + 1) + ' de ' + data.tickets.length + '…');
+      if (foto) {
+        var b = await (await fetch(foto)).blob();
+        var a = await S.assets.upload(b); t.assetId = a.id;
+      }
+      await S.tkCol.doc(id).set(t); n++;
+    }
+    if (data.config && (data.config.colaborador || data.config.motivoBase) && S.cfgRef) { await S.cfgRef.set(Object.assign({}, S.cfg, data.config)); }
+    note($('bkNote'), 'ok', '✓ Importados ' + n + ' tickets' + (saltados ? ' (' + saltados + ' ya estaban)' : '') + '.');
+  } catch (e) { note($('bkNote'), 'err', 'No se pudo importar ese archivo.'); }
+});
+
+/* ---------- render ---------- */
+function render() {
+  if (S.view === 'mes') renderMes();
+  if (S.view === 'cerrar') renderCerrar();
+}
+
+/* ---------- init ---------- */
+(function initStatic() {
+  $('cCeco').innerHTML = CECOS.map(function (c) { return '<option value="' + esc(c).replace(/"/g, '&quot;') + '">' + esc(c) + '</option>'; }).join('');
+  $('cCeco').value = '18 -  Sales'; $('cColab').value = 'CASTILLO MARTIN'; $('cMotivo').value = 'REPRESENTACIÓN COMERCIAL';
+  $('mes').value = hoyMes();
+  renderChips();
+  renderCalendario();
+})();
+
+(async function init() {
+  if (!window.claude || !window.claude.use) { $('boot').classList.add('hide'); note($('fatal'), 'err', 'Abrí esta app desde claude.ai para usarla.'); return; }
+  var res = await Promise.all(['db', 'user', 'assets', 'sample', 'downloads'].map(function (n) { return claude.use(n).catch(function () { return null; }); }));
+  S.db = res[0]; var user = res[1]; S.assets = res[2]; S.sample = res[3]; S.downloads = res[4];
+  if (S.sample) { try { var lim = await S.sample.limits(); if (!lim.images) S.sample = null; } catch (e) { S.sample = null; } }
+  S.uid = user ? await user.id() : null;
+  if (!S.db || !S.uid || !S.assets) { $('boot').classList.add('hide'); note($('fatal'), 'err', 'No se pudo acceder a tu almacenamiento. Tenés que estar con tu sesión iniciada y ser el dueño de la app.'); return; }
+  S.cfgRef = S.db.doc('data/users/' + S.uid + '/config');
+  S.tkCol = S.cfgRef.collection('tickets');
+  var timer = setTimeout(function () { note($('boot'), 'warn', 'Tarda en conectar… los datos pueden no estar al día.'); }, 10000);
+  try {
+    var c = await S.cfgRef.get();
+    if (c.exists) {
+      S.cfg = c.data();
+      if (S.cfg.colaborador) $('cColab').value = S.cfg.colaborador;
+      if (S.cfg.motivoBase) $('cMotivo').value = S.cfg.motivoBase;
+      if (S.cfg.ceco) $('cCeco').value = S.cfg.ceco;
+      if (S.cfg.mes) $('mes').value = S.cfg.mes;
+    }
+  } catch (e) {}
+  // Tickets que Claude dejó para importar (p. ej. meses anteriores): se copian a tu espacio privado
+  try {
+    var imp = await S.db.collection('importar').get();
+    for (var k = 0; k < imp.docs.length; k++) {
+      var dd = imp.docs[k];
+      await S.tkCol.doc(dd.id).set(dd.data());
+      await S.db.doc('importar/' + dd.id).delete();
+    }
+  } catch (e) {}
+  S.tkCol.onSnapshot(function (snap) {
+    if (!snap.metadata.fromCache) { clearTimeout(timer); $('boot').classList.add('hide'); }
+    S.tickets = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+    render();
+  }, function (e) { clearTimeout(timer); $('boot').classList.add('hide'); note($('fatal'), 'err', 'Se perdió la conexión con tus datos. Recargá la página.'); });
+})();
+</script>
+<script src="plantilla.js" defer></script>
+<script src="exceljs.min.js" defer></script>
+<script src="docx.iife.js" defer></script>
+</body>
+</html>
