@@ -304,9 +304,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=12"></script>
-<script src="shim.js?v=12"></script>
-<script src="builders.js?v=12"></script>
+<script src="fb.bundle.js?v=13"></script>
+<script src="shim.js?v=13"></script>
+<script src="builders.js?v=13"></script>
 <script>
 var B = window.Builders;
 var CECOS = ['12 – Executive','11 - Legal ','13 – HR','15 - Plant Controller','16 – Accounting','17 - IT','18 -  Sales','26 - R&D','27 - Regulatory','28 – Brand Marketing','30 – General Plant','31 – Sweetener (Cloud)','40 – Indirect General','41 – Quality'];
@@ -839,7 +839,8 @@ function pct(a, b) { return b ? Math.round((a - b) / b * 100) : null; }
 function renderStats() {
   var tm = totalesPorMes(), meses = Object.keys(tm).sort();
   var ultMes = ticketsMes().map(function (t) { return (t.fecha || '').slice(0, 7); }).filter(Boolean).sort().pop();
-  var mes = S.statMes || ultMes || mesActual(), prev = mesAnterior(mes);
+  var ultCargado = meses.filter(function (m) { return tm[m].n > 0; }).pop();
+  var mes = S.statMes || ultMes || ultCargado || mesActual(), prev = mesAnterior(mes);
   var cur = tm[mes] || { total: 0, n: 0, grupos: {} }, ant = tm[prev];
   $('kMesLbl').textContent = nombreMes(mes); $('kMes').textContent = sinCent(B.money(cur.total));
   var v = ant ? pct(cur.total, ant.total) : null;
