@@ -123,9 +123,6 @@
       ws.getCell('J' + r).value = { formula: 'F' + r + '+G' + r + '+H' + r + '+I' + r, result: imp };
       ws.getCell('K' + r).value = tc;
       ws.getCell('L' + r).value = { formula: 'J' + r + '*K' + r, result: round2(imp * tc) };
-      var uniq = function (k) { var o = []; d.tickets.forEach(function (t) { var v = (t[k] || '').trim(); if (v && o.indexOf(v) < 0) o.push(v); }); return o.join(' / '); };
-      ws.getCell('C' + r).value = uniq('cuit') || null;
-      ws.getCell('D' + r).value = uniq('proveedor') || null;
       var n = d.tickets.length;
       ws.getCell('O' + r).value = descripcion(g) + ' (' + n + (n === 1 ? ' ticket' : ' tickets') + ')';
     }
@@ -137,7 +134,7 @@
     var old = wb.getWorksheet('DETALLE TICKETS'); if (old) wb.removeWorksheet(old.id);
     var d = wb.addWorksheet('DETALLE TICKETS');
     d.columns = [
-      { header: 'FECHA', key: 'f', width: 13 }, { header: 'CONCEPTO', key: 'c', width: 38 }, { header: 'RAZÓN SOCIAL', key: 'p', width: 30 }, { header: 'CUIT', key: 'u', width: 15 },
+      { header: 'FECHA', key: 'f', width: 13 }, { header: 'CONCEPTO', key: 'c', width: 38 }, { header: 'PROVEEDOR / LUGAR', key: 'p', width: 30 },
       { header: 'MONEDA', key: 'm', width: 16 }, { header: 'IMPORTE', key: 'i', width: 14 }, { header: 'TIPO DE CAMBIO', key: 'k', width: 14 },
       { header: 'IMPORTE EN ARS', key: 'a', width: 16 }, { header: 'N° EN WORD', key: 's', width: 12 }
     ];
@@ -145,12 +142,12 @@
     d.getRow(1).eachCell(function (c) { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0E2A47' } }; });
     filas.forEach(function (t) {
       var mon = t.moneda || 'ARS';
-      var row = d.addRow({ f: t.fecha ? isoToDate(t.fecha) : null, c: grupoDe(t.grupo || 'OTROS').concepto, p: t.proveedor || '', u: t.cuit || '', m: monedaDe(mon).label,
+      var row = d.addRow({ f: t.fecha ? isoToDate(t.fecha) : null, c: grupoDe(t.grupo || 'OTROS').concepto, p: t.proveedor || '', m: monedaDe(mon).label,
         i: round2(t.importe), k: mon === 'ARS' ? 1 : Number(t.tc) || 0, a: ars(t), s: t._n });
       row.font = { name: 'Calibri Light' };
     });
     var last = d.rowCount;
-    var tr = d.addRow({ p: 'TOTAL EN ARS', a: { formula: 'SUM(H2:H' + last + ')', result: total } });
+    var tr = d.addRow({ p: 'TOTAL EN ARS', a: { formula: 'SUM(G2:G' + last + ')', result: total } });
     tr.font = { name: 'Calibri Light', bold: true };
     d.getColumn('f').numFmt = 'dd/mm/yyyy'; d.getColumn('i').numFmt = '#,##0.00'; d.getColumn('a').numFmt = '#,##0.00'; d.getColumn('k').numFmt = '#,##0.0000';
 
