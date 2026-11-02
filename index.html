@@ -237,7 +237,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
       </div>
       <div id="alertas"></div>
       <div class="card">
-        <div class="file"><span class="ms" style="color:#1E7B45">table_view</span><div style="flex:1"><div id="nXlsx">—</div><div class="sub">Una fila por gasto, ordenadas por fecha</div></div></div>
+        <div class="file"><span class="ms" style="color:#1E7B45">table_view</span><div style="flex:1"><div id="nXlsx">—</div><div class="sub">Una fila por día y concepto, ordenadas por fecha</div></div></div>
         <button class="btn pri" id="dlXlsx"><span class="ms">download</span>Descargar Excel</button>
         <div class="file"><span class="ms" style="color:#2B579A">description</span><div style="flex:1"><div id="nDocx">—</div><div class="sub">Una página por concepto con las fotos</div></div></div>
         <button class="btn" id="dlDocx"><span class="ms">download</span>Descargar Word</button>
@@ -304,9 +304,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=15"></script>
-<script src="shim.js?v=15"></script>
-<script src="builders.js?v=15"></script>
+<script src="fb.bundle.js?v=16"></script>
+<script src="shim.js?v=16"></script>
+<script src="builders.js?v=16"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
