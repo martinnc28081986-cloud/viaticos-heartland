@@ -10,7 +10,7 @@
     appId: '1:439606639510:web:bea2fcf52bf7105e4cbbb7'
   };
   var EMAIL_PERMITIDO = 'martinnc28081986@gmail.com';
-  var MODELO = 'gemini-2.5-flash';
+  var MODELO = 'gemini-3.5-flash';
 
   var app = FB.initializeApp(CONFIG);
   var auth = FB.getAuth(app);
@@ -18,7 +18,7 @@
   try { fs = FB.initializeFirestore(app, { localCache: FB.persistentLocalCache() }); }
   catch (e) { fs = FB.initializeFirestore(app, {}); }
   var ai = FB.getAI(app, { backend: new FB.GoogleAIBackend() });
-  var model = FB.getGenerativeModel(ai, { model: MODELO, generationConfig: { responseMimeType: 'application/json', temperature: 0 } });
+  var model = FB.getGenerativeModel(ai, { model: MODELO, generationConfig: { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingBudget: 0 } } });
 
   var user = null, resolveReady;
   var ready = new Promise(function (r) { resolveReady = r; });
