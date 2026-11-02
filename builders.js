@@ -71,6 +71,11 @@
     });
     return out;
   }
+  // Texto de la columna de descripción del Excel
+  function descripcion(g) {
+    if (g.id === 'COMIDAS' || /COMIDAS Y ENTRETENIMIENTO/.test(g.id)) return 'COMIDA EN GIRA';
+    return (g.id.indexOf(' - ') > 0 ? g.id.slice(8) : g.id).toUpperCase();
+  }
   function numerar(grupos) { var n = 0; grupos.forEach(function (g) { g.tickets.forEach(function (t) { t._n = ++n; }); }); return n; }
 
   async function buildXlsx(ExcelJS, templateBuf, data) {
@@ -84,8 +89,10 @@
     if (data.motivo) ws.getCell('B11').value = data.motivo;
     if (data.ceco) ws.getCell('N10').value = data.ceco;
 
+    // Una fila por gasto, ordenadas por fecha (la más vieja primero)
+    var filas = data.tickets.slice().sort(function (a, b) { return (a.fecha || '').localeCompare(b.fecha || '') || (a.creado || '').localeCompare(b.creado || ''); });
     // Si hay más de 11 filas de gastos, se agregan filas antes de los totales
-    var extra = Math.max(0, grupos.length - 11), filaTot = 25 + extra, ultima = 24 + extra;
+    var extra = Math.max(0, filas.length - 11), filaTot = 25 + extra, ultima = 24 + extra;
     if (extra) {
       var merges = (ws.model.merges || []).filter(function (r) { return Number(r.match(/\d+/)[0]) >= 25; });
       merges.forEach(function (r) { ws.unMergeCells(r); });
@@ -94,28 +101,26 @@
       'FGHIJLN'.split('').forEach(function (c) { var v = ws.getCell(c + filaTot).value; if (v && v.formula) ws.getCell(c + filaTot).value = { formula: 'SUM(' + c + '14:' + c + ultima + ')' }; });
       ws.getCell('L9').value = { formula: '+L' + filaTot }; ws.getCell('E8').value = { formula: '+K' + filaTot };
     }
-    var cols = 'ABCDEFGHIJKLMNO'.split(''), total = 0;
+    var cols = 'ABCDEFGHIJKLMNO'.split(''), total = 0, totalOrig = 0;
     for (var r = 14; r <= ultima; r++) {
-      var gr = grupos[r - 14];
+      var t = filas[r - 14];
       cols.forEach(function (c) { ws.getCell(c + r).value = null; });
-      if (!gr) continue;
-      total += gr.totalArs;
+      if (!t) continue;
+      var g = grupoDe(t.grupo || 'OTROS'), mon = t.moneda || 'ARS', imp = round2(t.importe), tc = mon === 'ARS' ? 1 : Number(t.tc) || 0;
+      total += ars(t); totalOrig += imp;
       var fA = ws.getCell('A' + r);
-      if (gr.tickets.length === 1 && gr.ultimaFecha) { fA.value = isoToDate(gr.ultimaFecha); fA.style = Object.assign({}, fA.style, { numFmt: 'dd/mmm/yyyy' }); }
-      else { var mesRef = data.mes || (gr.ultimaFecha ? gr.ultimaFecha.slice(0, 7) : null); if (mesRef) { fA.value = isoToDate(mesRef + '-01'); fA.style = Object.assign({}, fA.style, { numFmt: 'mmm/yyyy' }); } }
-      ws.getCell('B' + r).value = gr.grupo.concepto;
-      ws.getCell('E' + r).value = monedaDe(gr.moneda).label;
-      ws.getCell('F' + r).value = gr.total;
-      ws.getCell('J' + r).value = { formula: 'F' + r + '+G' + r + '+H' + r + '+I' + r, result: gr.total };
-      var tc = gr.moneda === 'ARS' ? 1 : (gr.total ? Math.round(gr.totalArs / gr.total * 10000) / 10000 : 0);
+      if (t.fecha) { fA.value = isoToDate(t.fecha); fA.style = Object.assign({}, fA.style, { numFmt: 'dd/mmm/yyyy' }); }
+      ws.getCell('B' + r).value = g.concepto;
+      ws.getCell('E' + r).value = monedaDe(mon).label;
+      ws.getCell('F' + r).value = imp;
+      ws.getCell('J' + r).value = { formula: 'F' + r + '+G' + r + '+H' + r + '+I' + r, result: imp };
       ws.getCell('K' + r).value = tc;
-      ws.getCell('L' + r).value = { formula: 'J' + r + '*K' + r, result: round2(gr.total * tc) };
-      var n = gr.tickets.length, nombre = gr.grupo.id.indexOf(' - ') > 0 ? gr.grupo.id.slice(8) : gr.grupo.id;
-      ws.getCell('O' + r).value = nombre + ' (' + n + (n === 1 ? ' ticket' : ' tickets') + ')';
+      ws.getCell('L' + r).value = { formula: 'J' + r + '*K' + r, result: round2(imp * tc) };
+      ws.getCell('O' + r).value = descripcion(g);
     }
-    total = round2(total);
+    total = round2(total); totalOrig = round2(totalOrig);
     var setRes = function (addr, res) { var v = ws.getCell(addr).value; if (v && v.formula) ws.getCell(addr).value = { formula: v.formula, result: res }; };
-    setRes('F' + filaTot, round2(grupos.reduce(function (s, g) { return s + g.total; }, 0))); setRes('J' + filaTot, round2(grupos.reduce(function (s, g) { return s + g.total; }, 0)));
+    setRes('F' + filaTot, totalOrig); setRes('J' + filaTot, totalOrig);
     setRes('L' + filaTot, total); setRes('L9', total);
 
     var old = wb.getWorksheet('DETALLE TICKETS'); if (old) wb.removeWorksheet(old.id);
@@ -127,12 +132,11 @@
     ];
     d.getRow(1).font = { name: 'Calibri Light', bold: true, color: { argb: 'FFFFFFFF' } };
     d.getRow(1).eachCell(function (c) { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0E2A47' } }; });
-    grupos.forEach(function (gr) {
-      gr.tickets.forEach(function (t) {
-        var row = d.addRow({ f: t.fecha ? isoToDate(t.fecha) : null, c: gr.grupo.concepto, p: t.proveedor || '', m: monedaDe(gr.moneda).label,
-          i: round2(t.importe), k: gr.moneda === 'ARS' ? 1 : Number(t.tc) || 0, a: ars(t), s: t._n });
-        row.font = { name: 'Calibri Light' };
-      });
+    filas.forEach(function (t) {
+      var mon = t.moneda || 'ARS';
+      var row = d.addRow({ f: t.fecha ? isoToDate(t.fecha) : null, c: grupoDe(t.grupo || 'OTROS').concepto, p: t.proveedor || '', m: monedaDe(mon).label,
+        i: round2(t.importe), k: mon === 'ARS' ? 1 : Number(t.tc) || 0, a: ars(t), s: t._n });
+      row.font = { name: 'Calibri Light' };
     });
     var last = d.rowCount;
     var tr = d.addRow({ p: 'TOTAL EN ARS', a: { formula: 'SUM(G2:G' + last + ')', result: total } });
