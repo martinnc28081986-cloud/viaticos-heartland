@@ -16,6 +16,8 @@
   // App Check (reCAPTCHA Enterprise): Firebase AI Logic exige que los pedidos vengan de esta página
   try { FB.initializeAppCheck(app, { provider: new FB.ReCaptchaEnterpriseProvider('6LcVZgsuAAAAAJOgXPu7WPW3ZBndWIDUEvFU8dOl'), isTokenAutoRefreshEnabled: true }); } catch (e) {}
   var auth = FB.getAuth(app);
+  // Guardar la sesión también en localStorage: algunos celulares borran IndexedDB al cerrar la app
+  var persistReady = FB.setPersistence(auth, FB.browserLocalPersistence).catch(function () {});
   var fs;
   try { fs = FB.initializeFirestore(app, { localCache: FB.persistentLocalCache() }); }
   catch (e) { fs = FB.initializeFirestore(app, {}); }
@@ -136,6 +138,7 @@
   }
   document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btnLogin').onclick = async function () {
+      await persistReady;
       var prov = new FB.GoogleAuthProvider(); prov.setCustomParameters({ prompt: 'select_account' });
       try { await FB.signInWithPopup(auth, prov); }
       catch (e) {
