@@ -304,10 +304,19 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=13"></script>
-<script src="shim.js?v=13"></script>
-<script src="builders.js?v=13"></script>
+<script src="fb.bundle.js?v=14"></script>
+<script src="shim.js?v=14"></script>
+<script src="builders.js?v=14"></script>
 <script>
+// Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
+if (!window.Builders || !window.FB || !window.claude) {
+  var reint = false; try { reint = sessionStorage.getItem('reintento') === '1'; sessionStorage.setItem('reintento', '1'); } catch (e) {}
+  if (!reint) setTimeout(function () { location.reload(); }, 1500);
+  var bt = document.getElementById('boot'); bt.className = 'note warn';
+  bt.innerHTML = reint ? 'No se pudo cargar la app completa. Revisá la conexión y tocá Reintentar.<button class="btn pri" style="margin:10px 0 0" onclick="location.reload()">Reintentar</button>' : '<span class="spin"></span>La conexión está lenta, reintentando…';
+  throw new Error('carga incompleta');
+}
+try { sessionStorage.removeItem('reintento'); } catch (e) {}
 var B = window.Builders;
 var CECOS = ['12 – Executive','11 - Legal ','13 – HR','15 - Plant Controller','16 – Accounting','17 - IT','18 -  Sales','26 - R&D','27 - Regulatory','28 – Brand Marketing','30 – General Plant','31 – Sweetener (Cloud)','40 – Indirect General','41 – Quality'];
 var COLORES = ['#4BA3E8', '#F2B544', '#5CC9A7', '#E58A8A', '#A88BEB', '#7FC4D8', '#F59E5B', '#9BB55A', '#D57DB5', '#8D9DB0'];
