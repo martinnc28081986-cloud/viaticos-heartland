@@ -164,12 +164,28 @@
     return true;
   };
 
+  // ---------- Acceso: Martín es admin; el resto pide acceso y él aprueba ----------
+  var esAdmin = false;
+  window.Acceso = {
+    esAdmin: function () { return esAdmin; },
+    escuchar: function (cb) {
+      return FB.onSnapshot(FB.collection(fs, 'acceso'), function (qs) { cb(qs.docs.map(function (d) { return Object.assign({ uid: d.id }, d.data()); })); }, function () {});
+    },
+    decidir: function (uid, estado) { return FB.updateDoc(FB.doc(fs, 'acceso/' + uid), { estado: estado, decididaEl: new Date().toISOString() }); }
+  };
+
   // ---------- Login ----------
-  function pantallaLogin(msg) {
+  function pantallaLogin(msg, opts) {
+    opts = opts || {};
     var el = document.getElementById('login');
     document.body.classList.add('nologin');
     el.classList.remove('hide');
-    document.getElementById('loginMsg').textContent = msg || '';
+    document.getElementById('loginTit').textContent = opts.tit || 'Viáticos Heartland';
+    document.getElementById('loginSub').textContent = opts.sub || 'Entrá con tu cuenta de Google para ver y cargar tus gastos.';
+    document.getElementById('loginIco').textContent = opts.ico || 'receipt_long';
+    document.getElementById('btnLogin').classList.toggle('hide', !!opts.sinBoton);
+    document.getElementById('btnSalirLogin').classList.toggle('hide', !opts.sinBoton);
+    var m = document.getElementById('loginMsg'); m.textContent = msg || ''; m.style.color = opts.ok ? 'var(--tx2)' : 'var(--err)';
   }
   document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btnLogin').onclick = async function () {
@@ -181,16 +197,39 @@
         else pantallaLogin('No se pudo iniciar sesión.');
       }
     };
-    document.getElementById('btnSalir').onclick = function () { FB.signOut(auth).then(function () { location.reload(); }); };
+    function salir() { FB.signOut(auth).then(function () { location.reload(); }); }
+    document.getElementById('btnSalir').onclick = salir;
+    document.getElementById('btnSalirLogin').onclick = salir;
   });
   FB.getRedirectResult(auth).catch(function () {});
-  FB.onAuthStateChanged(auth, function (u) {
-    if (!u) { pantallaLogin(''); return; }
-    if ((u.email || '').toLowerCase() !== EMAIL_PERMITIDO) { pantallaLogin('La cuenta ' + u.email + ' no tiene acceso a esta app.'); FB.signOut(auth); return; }
+  var entro = false, desuscribir = null;
+  function entrar(u) {
+    if (entro) return; entro = true;
     user = u;
     document.getElementById('login').classList.add('hide');
     document.body.classList.remove('nologin');
     document.getElementById('btnSalir').classList.remove('hide');
     resolveReady();
+  }
+  FB.onAuthStateChanged(auth, async function (u) {
+    if (desuscribir) { desuscribir(); desuscribir = null; }
+    if (!u) { pantallaLogin(''); return; }
+    var email = (u.email || '').toLowerCase();
+    esAdmin = email === EMAIL_PERMITIDO;
+    if (esAdmin) { entrar(u); return; }
+    var nombre = (u.displayName || email).split(' ')[0];
+    var ref = FB.doc(fs, 'acceso/' + u.uid);
+    pantallaLogin('', { sinBoton: true, ok: true, ico: 'hourglass_top', tit: 'Verificando acceso…', sub: email });
+    try {
+      var s = await FB.getDoc(ref);
+      if (!s.exists()) await FB.setDoc(ref, { email: u.email, nombre: u.displayName || '', foto: u.photoURL || '', estado: 'pendiente', creada: new Date().toISOString() });
+    } catch (e) { pantallaLogin('No se pudo enviar la solicitud. Probá de nuevo más tarde.', { sinBoton: true, ico: 'error', tit: 'Sin conexión', sub: email }); return; }
+    desuscribir = FB.onSnapshot(ref, function (d) {
+      var est = d.exists() ? d.data().estado : 'pendiente';
+      if (est === 'aprobado') { entrar(u); return; }
+      if (entro) { location.reload(); return; }
+      if (est === 'rechazado') pantallaLogin('Si creés que es un error, pedile al administrador que te habilite.', { sinBoton: true, ico: 'block', tit: 'Sin acceso', sub: email });
+      else pantallaLogin('Cuando te aprueben, esta pantalla se actualiza sola.', { sinBoton: true, ok: true, ico: 'hourglass_top', tit: 'Hola ' + nombre + ', tu solicitud está pendiente', sub: email });
+    }, function () {});
   });
 })();

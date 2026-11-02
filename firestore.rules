@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function esAdmin() {
+      return request.auth != null && request.auth.token.email == 'martinnc28081986@gmail.com' && request.auth.token.email_verified == true;
+    }
+    function aprobado(uid) {
+      return get(/databases/$(database)/documents/acceso/$(uid)).data.estado == 'aprobado';
+    }
+    match /acceso/{uid} {
+      allow read: if esAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.email == request.auth.token.email;
+      allow update, delete: if esAdmin();
+    }
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid && (esAdmin() || aprobado(uid));
+    }
+  }
+}

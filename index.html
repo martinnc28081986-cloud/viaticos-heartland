@@ -19,7 +19,7 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:Inter,-apple-syst
 #app{max-width:560px;margin:0 auto;min-height:100vh;padding-bottom:84px;position:relative}
 .view{display:none}.view.on{display:block}
 .hide{display:none!important}
-.nologin .view,.nologin .bnav,.nologin #boot{display:none!important}
+.nologin .view,.nologin .bnav,.nologin #boot,.onbon .view,.onbon .bnav{display:none!important}
 .login{max-width:400px;margin:18vh auto 0;text-align:center}
 .login .ms{font-size:48px;color:var(--ac)}
 .hero{background:var(--navy);color:#fff;padding:16px 16px 34px;border-radius:0 0 22px 22px}
@@ -124,13 +124,24 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 <body>
 <div id="app">
   <div class="wrap"><div id="login" class="card login hide">
-    <span class="ms">receipt_long</span>
-    <h2 style="margin:6px 0 2px;font-size:20px">Viáticos Heartland</h2>
-    <p class="sub">Entrá con tu cuenta de Google para ver y cargar tus gastos.</p>
+    <span class="ms" id="loginIco">receipt_long</span>
+    <h2 style="margin:6px 0 2px;font-size:20px" id="loginTit">Viáticos Heartland</h2>
+    <p class="sub" id="loginSub">Entrá con tu cuenta de Google para ver y cargar tus gastos.</p>
     <button class="btn pri" id="btnLogin">Entrar con Google</button>
     <p class="sub" id="loginMsg" style="color:var(--err)"></p>
+    <button class="btn hide" id="btnSalirLogin">Salir</button>
   </div></div>
-  <div class="wrap"><div id="boot" class="note info"><span class="spin"></span>Conectando…</div><div id="fatal" class="note err hide"></div></div>
+  <div class="wrap"><div id="boot" class="note info"><span class="spin"></span>Conectando…</div><div id="fatal" class="note err hide"></div>
+  <div id="onb" class="card hide" style="margin-top:14px">
+    <b style="display:flex;align-items:center;gap:6px;font-size:17px"><span class="ms" style="color:var(--ac)">manage_accounts</span>Configurá tu rendición</b>
+    <p class="sub" style="margin:6px 0 12px">Son los datos que van en tu planilla. Los podés cambiar después en Cerrar rendición.</p>
+    <label class="field"><span>Nombre como figura en la planilla (APELLIDO NOMBRE)</span><input type="text" id="oColab" placeholder="PEREZ AGUSTINA"></label>
+    <label class="field"><span>Centro de costo (CeCo)</span><select id="oCeco"></select></label>
+    <label class="field"><span>Motivo del gasto</span><input type="text" id="oMotivo" value="REPRESENTACIÓN COMERCIAL"></label>
+    <label class="field"><span>Mail donde recibís las planillas</span><input type="text" id="oMail" inputmode="email" placeholder="nombre.apellido@heartlandfpg.com"></label>
+    <div id="onbNote" class="note hide"></div>
+    <button class="btn pri" id="onbOk"><span class="ms">arrow_forward</span>Empezar a cargar gastos</button>
+  </div></div>
 
   <!-- INICIO -->
   <section id="v-inicio" class="view on">
@@ -144,6 +155,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
       </button>
     </header>
     <div class="wrap float">
+      <div id="solic"></div>
       <div class="card calc" id="calBanner"></div>
       <div class="quick">
         <button class="qa pri" id="qNuevo"><span class="ms">photo_camera</span>Nuevo gasto</button>
@@ -235,6 +247,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
         <button class="btn" id="btnRendida"><span class="ms">task_alt</span><span id="btnRendidaTxt">Marcar como rendida</span></button>
       </div>
       <div class="card sub" id="calLista"></div>
+      <div class="card hide" id="usrCard"><b style="display:flex;align-items:center;gap:6px"><span class="ms" style="color:var(--ac)">group</span>Usuarios</b><p class="sub" style="margin:6px 0 8px">Personas que pidieron usar la app. Cada una ve solo sus gastos.</p><div id="usrList"></div></div>
       <button class="btn danger" id="btnBorrarRend" style="margin:0 0 12px"><span class="ms">delete</span><span id="btnBorrarRendTxt">Borrar rendición</span></button>
       <div class="card">
         <details><summary>Respaldo de datos</summary>
@@ -285,9 +298,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=9"></script>
-<script src="shim.js?v=9"></script>
-<script src="builders.js?v=9"></script>
+<script src="fb.bundle.js?v=10"></script>
+<script src="shim.js?v=10"></script>
+<script src="builders.js?v=10"></script>
 <script>
 var B = window.Builders;
 var CECOS = ['12 – Executive','11 - Legal ','13 – HR','15 - Plant Controller','16 – Accounting','17 - IT','18 -  Sales','26 - R&D','27 - Regulatory','28 – Brand Marketing','30 – General Plant','31 – Sweetener (Cloud)','40 – Indirect General','41 – Quality'];
@@ -719,7 +732,7 @@ $('btnMail').onclick = async function () {
     note($('mailNote'), 'ok', '✓ Mail enviado a ' + esc(to) + ' con el Excel y el Word adjuntos.');
   } catch (e) {
     var m = String((e && (e.code || e.message)) || e);
-    note($('mailNote'), 'err', /popup-closed|cancelled-popup|user-cancelled/.test(m) ? 'Cancelaste el permiso de Google. Tocá de nuevo cuando quieras.' : /popup-blocked/.test(m) ? 'El navegador bloqueó la ventana de Google. Permití ventanas emergentes para este sitio y probá de nuevo.' : 'No se pudo enviar el mail: ' + esc(m)) + (navigator.canShare ? '<br>Mientras tanto usá <b>Compartir con otra app</b> → Gmail: la dirección queda copiada para pegarla en "Para".' : ''));
+    note($('mailNote'), 'err', (/popup-closed|cancelled-popup|user-cancelled/.test(m) ? 'Cancelaste el permiso de Google. Tocá de nuevo cuando quieras.' : /popup-blocked/.test(m) ? 'El navegador bloqueó la ventana de Google. Permití ventanas emergentes para este sitio y probá de nuevo.' : 'No se pudo enviar el mail: ' + esc(m)) + (navigator.canShare ? '<br>Mientras tanto usá <b>Compartir con otra app</b> → Gmail: la dirección queda copiada para pegarla en "Para".' : ''));
   } finally { btn.disabled = false; btn.innerHTML = html; }
 };
 if (navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.txt', { type: 'text/plain' })] })) $('btnShare').classList.remove('hide');
@@ -837,6 +850,53 @@ function renderStats() {
   }).join('') : '<div class="empty">No hay gastos en este mes.</div>';
 }
 
+
+/* ---------- alta de usuarios ---------- */
+function mostrarOnb() {
+  $('oCeco').innerHTML = $('cCeco').innerHTML; $('oCeco').selectedIndex = -1;
+  $('onb').classList.remove('hide'); document.body.classList.add('onbon');
+}
+$('onbOk').onclick = function () {
+  var n = $('oColab').value.trim().toUpperCase(), m = $('oMail').value.trim();
+  if (!n) { note($('onbNote'), 'err', 'Completá tu nombre.'); return; }
+  if ($('oCeco').selectedIndex < 0) { note($('onbNote'), 'err', 'Elegí tu centro de costo.'); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m)) { note($('onbNote'), 'err', 'Revisá el mail.'); return; }
+  $('cColab').value = n; $('cCeco').value = $('oCeco').value; $('cMotivo').value = $('oMotivo').value.trim() || 'REPRESENTACIÓN COMERCIAL'; $('cMail').value = m;
+  guardarCfgYa();
+  $('avatar').textContent = n.split(/\s+/).map(function (w) { return w.charAt(0); }).reverse().join('').slice(0, 2);
+  $('onb').classList.add('hide'); document.body.classList.remove('onbon'); render();
+};
+var CONSOLA_PRUEBA = 'https://console.cloud.google.com/auth/audience?project=viaticos-heartland';
+function iniciarAdmin() {
+  $('usrCard').classList.remove('hide');
+  Acceso.escuchar(function (lista) { S.accesos = lista; renderAccesos(); });
+}
+function renderAccesos() {
+  var L = S.accesos || [];
+  var pend = L.filter(function (a) { return a.estado === 'pendiente'; });
+  $('solic').innerHTML = pend.map(function (a) {
+    var nom = a.nombre || a.email, ini = nom.split(/\s+/).map(function (w) { return w.charAt(0); }).join('').slice(0, 2).toUpperCase();
+    return '<div class="card" style="border:1px solid #B5D4F4;background:#EEF5FC"><div style="display:flex;align-items:center;gap:10px"><span class="avatar" style="background:var(--ac);color:#fff">' + esc(ini) + '</span><div style="flex:1;min-width:0"><b>' + esc(nom.split(' ')[0]) + ' pide acceso</b><div class="sub" style="overflow:hidden;text-overflow:ellipsis">' + esc(a.email) + '</div></div></div>' +
+      '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn pri" style="margin:0" data-apr="' + a.uid + '">Aprobar</button><button class="btn" style="margin:0" data-rech="' + a.uid + '">Rechazar</button></div></div>';
+  }).join('') + (S.recienAprobado ? '<div class="card"><b>✓ ' + esc(S.recienAprobado) + ' ya puede entrar</b><p class="sub" style="margin:6px 0 10px">Para que también pueda mandarse las planillas por mail desde la app, agregá su Gmail como usuario de prueba. Ya lo copié: pegalo en <b>Usuarios de prueba → Agregar usuarios</b> y guardá.</p><a class="btn pri" style="margin:0 0 8px;text-decoration:none" href="' + CONSOLA_PRUEBA + '" target="_blank" rel="noopener"><span class="ms">forward_to_inbox</span>Habilitar envío por mail</a><button class="btn" style="margin:0" id="okAprob">Listo</button></div>' : '');
+  var otros = L.filter(function (a) { return a.estado !== 'pendiente'; });
+  $('usrList').innerHTML = otros.length ? otros.map(function (a) {
+    var ok = a.estado === 'aprobado';
+    return '<div class="file" style="align-items:center"><span class="ms" style="color:' + (ok ? '#1E7B45' : 'var(--tx2)') + '">' + (ok ? 'check_circle' : 'block') + '</span><div style="flex:1;min-width:0"><div>' + esc(a.nombre || a.email) + '</div><div class="sub" style="overflow:hidden;text-overflow:ellipsis">' + esc(a.email) + ' · ' + (ok ? 'con acceso' : 'sin acceso') + '</div></div>' +
+      (ok ? '<button class="btn" style="width:auto;margin:0;padding:6px 10px" data-rech="' + a.uid + '">Quitar</button>' : '<button class="btn" style="width:auto;margin:0;padding:6px 10px" data-apr="' + a.uid + '">Aprobar</button>') + '</div>';
+  }).join('') : '<div class="sub">Todavía nadie pidió acceso. Pasales el link de la app.</div>';
+}
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-apr],[data-rech],#okAprob'); if (!b) return;
+  if (b.id === 'okAprob') { S.recienAprobado = null; renderAccesos(); return; }
+  var uid = b.getAttribute('data-apr') || b.getAttribute('data-rech'), apr = b.hasAttribute('data-apr');
+  var a = (S.accesos || []).filter(function (x) { return x.uid === uid; })[0]; if (!a) return;
+  if (!apr && a.estado === 'aprobado' && b.dataset.seguro !== '1') { b.dataset.seguro = '1'; b.textContent = '¿Seguro?'; return; }
+  b.disabled = true;
+  Acceso.decidir(uid, apr ? 'aprobado' : 'rechazado').then(function () {
+    if (apr) { S.recienAprobado = (a.nombre || a.email).split(' ')[0]; try { navigator.clipboard.writeText(a.email).catch(function () {}); } catch (e2) {} renderAccesos(); }
+  }).catch(function () { b.disabled = false; alert('No se pudo guardar. Revisá la conexión.'); });
+});
 /* ---------- render / init ---------- */
 function render() {
   if (S.view === 'inicio') renderInicio();
@@ -847,7 +907,7 @@ function render() {
   if (S.view === 'nuevo') $('nRend').textContent = 'Rendición ' + etiquetaRend(rendSel());
 }
 (function initStatic() {
-  $('cCeco').value = '18 -  Sales'; $('cColab').value = 'CASTILLO MARTIN'; $('cMail').value = 'Martin.Castillo@heartlandfpg.com'; $('cMotivo').value = 'REPRESENTACIÓN COMERCIAL';
+  $('cMotivo').value = 'REPRESENTACIÓN COMERCIAL';
   renderChips(); actualizarMoneda(); renderInicio();
 })();
 (async function init() {
@@ -857,6 +917,8 @@ function render() {
   if (S.sample) { try { var lim = await S.sample.limits(); if (!lim.images) S.sample = null; } catch (e) { S.sample = null; } }
   S.uid = user ? await user.id() : null;
   if (!S.db || !S.uid || !S.assets) { $('boot').classList.add('hide'); note($('fatal'), 'err', 'No se pudo acceder a tu almacenamiento. Tenés que estar con tu sesión iniciada y ser el dueño de la app.'); return; }
+  var admin = window.Acceso && Acceso.esAdmin();
+  if (admin) { $('cCeco').value = '18 -  Sales'; $('cColab').value = 'CASTILLO MARTIN'; $('cMail').value = 'Martin.Castillo@heartlandfpg.com'; iniciarAdmin(); }
   S.cfgRef = S.db.doc('data/users/' + S.uid + '/config');
   S.tkCol = S.cfgRef.collection('tickets');
   var timer = setTimeout(function () { note($('boot'), 'warn', 'Tarda en conectar… los datos pueden no estar al día.'); }, 10000);
@@ -871,7 +933,7 @@ function render() {
       S.sel = S.cfg.sel || null; S.cfgGuardada = JSON.stringify(S.cfg);
       var ini = (S.cfg.colaborador || 'MC').split(/\s+/).map(function (w) { return w.charAt(0); }).reverse().join('').slice(0, 2);
       $('avatar').textContent = ini;
-    }
+    } else if (!admin) mostrarOnb();
   } catch (e) {}
   try {
     var imp = await S.db.collection('importar').get();
