@@ -57,10 +57,10 @@
       // Un solo ticket: su fecha. Varios tickets juntos: solo el mes (ej. oct/2026)
       if (gr.tickets.length === 1 && gr.ultimaFecha) {
         ws.getCell('A' + r).value = isoToDate(gr.ultimaFecha);
-        ws.getCell('A' + r).numFmt = 'dd/mmm/yyyy';
+        ws.getCell('A' + r).style = Object.assign({}, ws.getCell('A' + r).style, { numFmt: 'dd/mmm/yyyy' });
       } else {
         var mesRef = data.mes || (gr.ultimaFecha ? gr.ultimaFecha.slice(0, 7) : null);
-        if (mesRef) { ws.getCell('A' + r).value = isoToDate(mesRef + '-01'); ws.getCell('A' + r).numFmt = 'mmm/yyyy'; }
+        if (mesRef) { ws.getCell('A' + r).value = isoToDate(mesRef + '-01'); ws.getCell('A' + r).style = Object.assign({}, ws.getCell('A' + r).style, { numFmt: 'mmm/yyyy' }); }
       }
       ws.getCell('B' + r).value = gr.grupo.concepto;
       ws.getCell('E' + r).value = 'ARS - Argentina';
