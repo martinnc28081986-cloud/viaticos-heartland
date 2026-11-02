@@ -285,9 +285,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=8"></script>
-<script src="shim.js?v=8"></script>
-<script src="builders.js?v=8"></script>
+<script src="fb.bundle.js?v=9"></script>
+<script src="shim.js?v=9"></script>
+<script src="builders.js?v=9"></script>
 <script>
 var B = window.Builders;
 var CECOS = ['12 – Executive','11 - Legal ','13 – HR','15 - Plant Controller','16 – Accounting','17 - IT','18 -  Sales','26 - R&D','27 - Regulatory','28 – Brand Marketing','30 – General Plant','31 – Sweetener (Cloud)','40 – Indirect General','41 – Quality'];
@@ -719,7 +719,7 @@ $('btnMail').onclick = async function () {
     note($('mailNote'), 'ok', '✓ Mail enviado a ' + esc(to) + ' con el Excel y el Word adjuntos.');
   } catch (e) {
     var m = String((e && (e.code || e.message)) || e);
-    note($('mailNote'), 'err', /popup-closed|cancelled-popup|user-cancelled/.test(m) ? 'Cancelaste el permiso de Google. Tocá de nuevo cuando quieras.' : /popup-blocked/.test(m) ? 'El navegador bloqueó la ventana de Google. Permití ventanas emergentes para este sitio y probá de nuevo.' : 'No se pudo enviar el mail: ' + esc(m));
+    note($('mailNote'), 'err', /popup-closed|cancelled-popup|user-cancelled/.test(m) ? 'Cancelaste el permiso de Google. Tocá de nuevo cuando quieras.' : /popup-blocked/.test(m) ? 'El navegador bloqueó la ventana de Google. Permití ventanas emergentes para este sitio y probá de nuevo.' : 'No se pudo enviar el mail: ' + esc(m)) + (navigator.canShare ? '<br>Mientras tanto usá <b>Compartir con otra app</b> → Gmail: la dirección queda copiada para pegarla en "Para".' : ''));
   } finally { btn.disabled = false; btn.innerHTML = html; }
 };
 if (navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.txt', { type: 'text/plain' })] })) $('btnShare').classList.remove('hide');
@@ -728,7 +728,8 @@ $('btnShare').onclick = async function () {
   try {
     var fs = (await adjuntos()).map(function (a) { return new File([a.blob], a.name, { type: a.type }); });
     btn.innerHTML = html; btn.disabled = false;
-    await navigator.share({ files: fs, title: 'Rendición de gastos ' + etiquetaRend(rendSel()), text: textoMail() });
+    try { await navigator.clipboard.writeText($('cMail').value.trim()); } catch (e2) {}
+    await navigator.share({ files: fs, title: 'Rendición de gastos ' + etiquetaRend(rendSel()), text: 'Para: ' + $('cMail').value.trim() + '\n\n' + textoMail() });
   } catch (e) { if (!(e && e.name === 'AbortError')) note($('mailNote'), 'err', 'No se pudo compartir.'); }
   finally { btn.disabled = false; btn.innerHTML = html; }
 };
