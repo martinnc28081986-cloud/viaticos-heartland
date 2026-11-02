@@ -161,6 +161,12 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
         <button class="qa pri" id="qNuevo"><span class="ms">photo_camera</span>Nuevo gasto</button>
         <button class="qa" id="qEnviar"><span class="ms">task_alt</span>Cerrar rendición</button>
       </div>
+      <div class="card hide" id="todoRendido" style="text-align:center;padding:22px 16px">
+        <span class="ms" style="font-size:40px;color:#1E7B45">task_alt</span>
+        <div style="font-weight:600;font-size:17px;margin-top:6px">Tenés todo rendido</div>
+        <p class="sub" style="margin:6px 0 14px">Iniciá una nueva rendición para empezar a cargar gastos.</p>
+        <button class="btn pri" id="btnIniciarRend" style="margin:0"><span class="ms">add</span>Iniciar nueva rendición</button>
+      </div>
       <div class="sect"><span>Últimos gastos</span><button class="lnk" id="verTodos">Ver todos</button></div>
       <div class="list" id="ultimos"></div>
     </div>
@@ -298,9 +304,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=10"></script>
-<script src="shim.js?v=10"></script>
-<script src="builders.js?v=10"></script>
+<script src="fb.bundle.js?v=11"></script>
+<script src="shim.js?v=11"></script>
+<script src="builders.js?v=11"></script>
 <script>
 var B = window.Builders;
 var CECOS = ['12 – Executive','11 - Legal ','13 – HR','15 - Plant Controller','16 – Accounting','17 - IT','18 -  Sales','26 - R&D','27 - Regulatory','28 – Brand Marketing','30 – General Plant','31 – Sweetener (Cloud)','40 – Indirect General','41 – Quality'];
@@ -362,10 +368,12 @@ function asegurarRendiciones() {
     lista.push({ id: 'm-' + t.mes, tipo: 'mes', desde: t.mes + '-01', hasta: ultimoDia(t.mes), estado: t.mes < hoyMes() ? 'rendida' : 'abierta' });
   });
   if (cambio) S.cfg = Object.assign({}, S.cfg, { rendiciones: lista });
-  if (!rendSel()) {
-    var orden = rends().slice().sort(function (a, b) { return a.hasta < b.hasta ? 1 : -1; });
-    var ab = orden.filter(function (r) { return r.estado !== 'rendida'; })[0];
-    S.sel = (ab || orden[0] || {}).id || null; cambio = true;
+  // Al abrir la app (y si la elegida ya no existe) se activa la rendición abierta más reciente; si está todo rendido, ninguna
+  if (!S.selInicial || !rendSel()) {
+    S.selInicial = true;
+    var ab = rends().filter(function (r) { return r.estado !== 'rendida'; }).sort(function (a, b) { return a.hasta < b.hasta ? 1 : -1; })[0];
+    var nuevo = ab ? ab.id : null;
+    if (nuevo !== S.sel) { S.sel = nuevo; cambio = true; }
   }
   if (cambio) guardarCfgYa();
 }
@@ -386,8 +394,9 @@ document.querySelectorAll('[data-back]').forEach(function (b) { b.onclick = func
 $('heroRend').onclick = function () { setView('rendiciones'); };
 $('gCambiar').onclick = function () { setView('rendiciones'); };
 $('verTodos').onclick = function () { setView('gastos'); };
-$('qNuevo').onclick = function () { abrirNuevo('inicio'); };
-$('fab').onclick = function () { abrirNuevo('gastos'); };
+$('qNuevo').onclick = function () { if (!rendSel()) { iniciarRend(); return; } abrirNuevo('inicio'); };
+function iniciarRend() { setView('rendiciones'); $('btnNueva').onclick(); }
+$('fab').onclick = function () { if (!rendSel()) { iniciarRend(); return; } abrirNuevo('gastos'); };
 $('qEnviar').onclick = function () { setView('enviar', 'inicio'); };
 function abrirNuevo(desde) { resetForm(); setView('nuevo', desde); }
 
@@ -560,6 +569,11 @@ function renderInicio() {
   $('hEstado').textContent = !r ? 'Creá una rendición' : r.estado === 'rendida' ? 'Rendida' : 'Abierta';
   $('hEstado').className = 'pill ' + (r && r.estado === 'rendida' ? 'p-done' : 'p-open');
   $('hCant').textContent = plural(ts.length, 'gasto', 'gastos');
+  var vacio = !r;
+  $('todoRendido').classList.toggle('hide', !vacio);
+  document.querySelector('#v-inicio .quick').classList.toggle('hide', vacio);
+  $('verTodos').parentNode.classList.toggle('hide', vacio); $('ultimos').classList.toggle('hide', vacio);
+  if (vacio) { $('hRend').textContent = 'Sin rendición abierta'; $('hEstado').textContent = 'Todo rendido'; $('hEstado').className = 'pill p-done'; }
   var box = $('ultimos'); box.innerHTML = '';
   var ult = ts.slice().sort(function (a, b) { return (b.creado || b.fecha || '').localeCompare(a.creado || a.fecha || ''); }).slice(0, 4);
   if (!ult.length) box.innerHTML = '<div class="empty">' + (r ? 'Todavía no cargaste gastos en esta rendición.' : 'Creá tu primera rendición en la pestaña Rendiciones.') + '</div>';
@@ -617,6 +631,7 @@ $('btnNueva').onclick = function () { NR.tipo = 'cierre'; $('nrDesde').value = '
 $('nrChips').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; NR.tipo = b.dataset.t; calcularNR(true); });
 $('nrDesde').addEventListener('change', function () { calcularNR(false); });
 $('nrHasta').addEventListener('change', function () { NR.tipo = 'libre'; calcularNR(false); });
+$('btnIniciarRend').onclick = iniciarRend;
 $('nrCancel').onclick = function () { $('nuevaRend').classList.add('hide'); };
 $('nrCrear').onclick = function () {
   var d = $('nrDesde').value, h = $('nrHasta').value;
