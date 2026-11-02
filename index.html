@@ -227,6 +227,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
         <button class="btn" id="btnRendida"><span class="ms">task_alt</span><span id="btnRendidaTxt">Marcar como rendida</span></button>
       </div>
       <div class="card sub" id="calLista"></div>
+      <button class="btn danger" id="btnBorrarRend" style="margin:0 0 12px"><span class="ms">delete</span><span id="btnBorrarRendTxt">Borrar rendición</span></button>
       <div class="card">
         <details><summary>Respaldo de datos</summary>
           <p class="sub">Baja o carga todos tus gastos con fotos (por ejemplo, para pasarlos a otra versión de la app).</p>
@@ -630,7 +631,7 @@ function renderEnviar() {
   $('motivoPrev').textContent = motivoCompleto();
   $('nXlsx').textContent = nombreArch('xlsx'); $('nDocx').textContent = nombreArch('docx');
   $('btnRendidaTxt').textContent = R && R.estado === 'rendida' ? 'Reabrir rendición' : 'Marcar como rendida';
-  $('btnRendida').disabled = !R;
+  $('btnRendida').disabled = !R; $('btnBorrarRend').disabled = !R;
   if (!ts.length) al.push(['warn', 'No hay gastos en esta rendición.']);
   var fuera = R ? ts.filter(function (t) { return t.fecha && (t.fecha < R.desde || t.fecha > R.hasta); }) : [];
   if (fuera.length) al.push(['warn', plural(fuera.length, 'gasto tiene', 'gastos tienen') + ' fecha fuera del período: ' + fuera.map(function (t) { return B.fechaAR(t.fecha) + ' (' + B.money(t.importe, t.moneda) + ')'; }).join(', ')]);
@@ -691,6 +692,28 @@ $('dlDocx').onclick = function () {
     }
     return await B.buildDocx(docx, d, imgs);
   });
+};
+
+/* ---------- borrar rendición ---------- */
+$('btnBorrarRend').onclick = async function () {
+  var R = rendSel(), b = this; if (!R) return;
+  var ts = ticketsDe(R);
+  if (b.dataset.c !== '1') {
+    b.dataset.c = '1';
+    $('btnBorrarRendTxt').textContent = ts.length ? 'Tocá de nuevo: se borran la rendición y ' + (ts.length === 1 ? 'su gasto' : 'sus ' + ts.length + ' gastos') : 'Tocá de nuevo para borrar la rendición';
+    setTimeout(function () { b.dataset.c = ''; $('btnBorrarRendTxt').textContent = 'Borrar rendición'; }, 4000);
+    return;
+  }
+  b.disabled = true; $('btnBorrarRendTxt').textContent = 'Borrando…';
+  try {
+    for (var i = 0; i < ts.length; i++) { await S.tkCol.doc(ts[i].id).delete(); if (ts[i].assetId) S.assets.delete(ts[i].assetId).catch(function () {}); }
+    var resto = rends().filter(function (r) { return r.id !== R.id; });
+    var orden = resto.slice().sort(function (a, c) { return a.hasta < c.hasta ? 1 : -1; });
+    var ab = orden.filter(function (r) { return r.estado !== 'rendida'; })[0];
+    S.cfg = Object.assign({}, S.cfg, { rendiciones: resto }); S.sel = (ab || orden[0] || {}).id || null; S.statMes = null;
+    guardarCfgYa(); setView('rendiciones');
+  } catch (e) { note($('dlNote'), 'err', 'No se pudo borrar la rendición. Probá de nuevo.'); }
+  finally { b.disabled = false; b.dataset.c = ''; $('btnBorrarRendTxt').textContent = 'Borrar rendición'; }
 };
 
 /* ---------- respaldo ---------- */
