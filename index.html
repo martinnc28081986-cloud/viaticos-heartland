@@ -147,7 +147,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
       <div class="card calc" id="calBanner"></div>
       <div class="quick">
         <button class="qa pri" id="qNuevo"><span class="ms">photo_camera</span>Nuevo gasto</button>
-        <button class="qa" id="qEnviar"><span class="ms">send</span>Enviar rendición</button>
+        <button class="qa" id="qEnviar"><span class="ms">task_alt</span>Cerrar rendición</button>
       </div>
       <div class="sect"><span>Últimos gastos</span><button class="lnk" id="verTodos">Ver todos</button></div>
       <div class="list" id="ultimos"></div>
@@ -209,7 +209,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 
   <!-- ENVIAR -->
   <section id="v-enviar" class="view">
-    <header class="hero sm"><div class="toprow"><h1><button class="icobtn" data-back aria-label="Volver"><span class="ms">arrow_back</span></button>Enviar rendición</h1></div><div style="margin-top:10px;font-weight:600" id="eRend">—</div><small id="eSub"></small></header>
+    <header class="hero sm"><div class="toprow"><h1><button class="icobtn" data-back aria-label="Volver"><span class="ms">arrow_back</span></button>Cerrar rendición</h1></div><div style="margin-top:10px;font-weight:600" id="eRend">—</div><small id="eSub"></small></header>
     <div class="wrap" style="margin-top:14px">
       <div class="card">
         <label class="field"><span>Colaborador</span><input type="text" id="cColab"></label>
@@ -224,6 +224,14 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
         <div class="file"><span class="ms" style="color:#2B579A">description</span><div style="flex:1"><div id="nDocx">—</div><div class="sub">Una página por concepto con las fotos</div></div></div>
         <button class="btn" id="dlDocx"><span class="ms">download</span>Descargar Word</button>
         <div id="dlNote" class="note hide"></div>
+      </div>
+      <div class="card">
+        <b style="display:flex;align-items:center;gap:6px"><span class="ms" style="color:var(--ac)">mail</span>Enviar planillas por mail</b>
+        <p class="sub" style="margin:6px 0 10px">Manda el Excel y el Word adjuntos desde tu Gmail.</p>
+        <label class="field"><span>Enviar a</span><input type="text" id="cMail" inputmode="email" autocomplete="email"></label>
+        <button class="btn pri" id="btnMail"><span class="ms">send</span>Enviar planillas por mail</button>
+        <button class="btn hide" id="btnShare"><span class="ms">share</span>Compartir con otra app</button>
+        <div id="mailNote" class="note hide"></div>
         <button class="btn" id="btnRendida"><span class="ms">task_alt</span><span id="btnRendidaTxt">Marcar como rendida</span></button>
       </div>
       <div class="card sub" id="calLista"></div>
@@ -277,9 +285,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=7"></script>
-<script src="shim.js?v=7"></script>
-<script src="builders.js?v=7"></script>
+<script src="fb.bundle.js?v=8"></script>
+<script src="shim.js?v=8"></script>
+<script src="builders.js?v=8"></script>
 <script>
 var B = window.Builders;
 var CECOS = ['12 – Executive','11 - Legal ','13 – HR','15 - Plant Controller','16 – Accounting','17 - IT','18 -  Sales','26 - R&D','27 - Regulatory','28 – Brand Marketing','30 – General Plant','31 – Sweetener (Cloud)','40 – Indirect General','41 – Quality'];
@@ -643,7 +651,7 @@ function renderEnviar() {
   if (ts.length && !al.length) al.push(['ok', '✓ ' + plural(ts.length, 'gasto', 'gastos') + ' sin alertas.']);
   $('alertas').innerHTML = al.map(function (a) { return '<div class="note ' + a[0] + '" style="margin:0 0 12px">' + esc(a[1]) + '</div>'; }).join('');
   var canDl = !!S.downloads && ts.length > 0;
-  $('dlXlsx').disabled = !canDl; $('dlDocx').disabled = !canDl;
+  $('dlXlsx').disabled = !canDl; $('dlDocx').disabled = !canDl; $('btnMail').disabled = !ts.length; $('btnShare').disabled = !ts.length;
   if (!S.downloads) note($('dlNote'), 'warn', 'Las descargas no están disponibles en este navegador.');
   renderCalendario();
 }
@@ -651,12 +659,12 @@ var cfgTimer = null;
 function guardarCfgYa() {
   clearTimeout(cfgTimer);
   if (!S.cfgRef) return;
-  var c = { colaborador: $('cColab').value.trim(), motivoBase: $('cMotivo').value.trim(), ceco: $('cCeco').value, rendiciones: rends(), sel: S.sel || null, tcs: S.cfg.tcs || {} };
+  var c = { colaborador: $('cColab').value.trim(), motivoBase: $('cMotivo').value.trim(), ceco: $('cCeco').value, mail: $('cMail').value.trim(), rendiciones: rends(), sel: S.sel || null, tcs: S.cfg.tcs || {} };
   if (JSON.stringify(c) === S.cfgGuardada) return;
   S.cfg = c; S.cfgGuardada = JSON.stringify(c); S.cfgRef.set(c).catch(function () {});
 }
 function guardarCfg() { clearTimeout(cfgTimer); cfgTimer = setTimeout(guardarCfgYa, 700); }
-['cColab', 'cMotivo'].forEach(function (id) { $(id).addEventListener('input', function () { guardarCfg(); $('motivoPrev').textContent = motivoCompleto(); }); });
+['cColab', 'cMotivo', 'cMail'].forEach(function (id) { $(id).addEventListener('input', function () { guardarCfg(); $('motivoPrev').textContent = motivoCompleto(); }); });
 $('cCeco').addEventListener('change', guardarCfg);
 $('btnRendida').onclick = function () {
   var R = rendSel(); if (!R) return;
@@ -674,24 +682,55 @@ async function guardarArchivo(btn, nombre, crear) {
   catch (e) { if (e && e.code === 'declined') note($('dlNote'), 'info', 'Descarga cancelada.'); else note($('dlNote'), 'err', 'No se pudo generar el archivo' + (e && e.message ? ': ' + esc(e.message) : '') + '.'); }
   finally { btn.disabled = false; btn.innerHTML = html; }
 }
-$('dlXlsx').onclick = function () {
-  guardarArchivo(this, nombreArch('xlsx'), async function () {
-    if (!window.PLANTILLA_B64) throw new Error('no se cargó la plantilla');
-    var bin = atob(window.PLANTILLA_B64), tpl = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) tpl[i] = bin.charCodeAt(i);
-    return new Blob([await B.buildXlsx(ExcelJS, tpl.buffer, datosExport())]);
-  });
+async function crearXlsx() {
+  if (!window.PLANTILLA_B64) throw new Error('no se cargó la plantilla');
+  var bin = atob(window.PLANTILLA_B64), tpl = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) tpl[i] = bin.charCodeAt(i);
+  return new Blob([await B.buildXlsx(ExcelJS, tpl.buffer, datosExport())], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+async function crearDocx() {
+  var d = datosExport(), imgs = {};
+  for (var i = 0; i < d.tickets.length; i++) {
+    var t = d.tickets[i]; if (!t.assetId) continue;
+    try { var src = await fotoDe(t); if (!src) continue; var r = await fetch(src); if (!r.ok) continue; var bl = await r.blob();
+      imgs[t.id] = { buf: new Uint8Array(await bl.arrayBuffer()), type: /png/.test(bl.type) ? 'png' : 'jpg', w: t.w || 3, h: t.h || 4 }; } catch (e) {}
+  }
+  var out = await B.buildDocx(docx, d, imgs);
+  return new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+$('dlXlsx').onclick = function () { guardarArchivo(this, nombreArch('xlsx'), crearXlsx); };
+$('dlDocx').onclick = function () { guardarArchivo(this, nombreArch('docx'), crearDocx); };
+async function adjuntos() {
+  return [{ name: nombreArch('xlsx'), blob: await crearXlsx(), type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+          { name: nombreArch('docx'), blob: await crearDocx(), type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }];
+}
+function textoMail() {
+  var R = rendSel(), ts = ticketsMes();
+  return 'Rendición de gastos ' + etiquetaRend(R) + '\n' + motivoCompleto() + '\nColaborador: ' + $('cColab').value.trim() + ' · CeCo ' + $('cCeco').value.trim() +
+    '\nTotal: ' + B.money(totalArs(ts)) + ' (' + plural(ts.length, 'gasto', 'gastos') + ')\n\nAdjuntos: reporte de gastos (Excel) y comprobantes (Word).';
+}
+$('btnMail').onclick = async function () {
+  var to = $('cMail').value.trim(), btn = this, html = btn.innerHTML;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { note($('mailNote'), 'err', 'Revisá la dirección de correo.'); return; }
+  if (!window.enviarMail) { note($('mailNote'), 'warn', 'El envío por mail no está disponible acá. Usá las descargas.'); return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Armando y enviando…'; $('mailNote').classList.add('hide');
+  try {
+    await window.enviarMail({ to: to, subject: 'Rendición de gastos ' + etiquetaRend(rendSel()) + ' – ' + $('cColab').value.trim(), body: textoMail(), files: await adjuntos() });
+    note($('mailNote'), 'ok', '✓ Mail enviado a ' + esc(to) + ' con el Excel y el Word adjuntos.');
+  } catch (e) {
+    var m = String((e && (e.code || e.message)) || e);
+    note($('mailNote'), 'err', /popup-closed|cancelled-popup|user-cancelled/.test(m) ? 'Cancelaste el permiso de Google. Tocá de nuevo cuando quieras.' : /popup-blocked/.test(m) ? 'El navegador bloqueó la ventana de Google. Permití ventanas emergentes para este sitio y probá de nuevo.' : 'No se pudo enviar el mail: ' + esc(m));
+  } finally { btn.disabled = false; btn.innerHTML = html; }
 };
-$('dlDocx').onclick = function () {
-  guardarArchivo(this, nombreArch('docx'), async function () {
-    var d = datosExport(), imgs = {};
-    for (var i = 0; i < d.tickets.length; i++) {
-      var t = d.tickets[i]; if (!t.assetId) continue;
-      try { var src = await fotoDe(t); if (!src) continue; var r = await fetch(src); if (!r.ok) continue; var bl = await r.blob();
-        imgs[t.id] = { buf: new Uint8Array(await bl.arrayBuffer()), type: /png/.test(bl.type) ? 'png' : 'jpg', w: t.w || 3, h: t.h || 4 }; } catch (e) {}
-    }
-    return await B.buildDocx(docx, d, imgs);
-  });
+if (navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.txt', { type: 'text/plain' })] })) $('btnShare').classList.remove('hide');
+$('btnShare').onclick = async function () {
+  var btn = this, html = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Armando archivos…';
+  try {
+    var fs = (await adjuntos()).map(function (a) { return new File([a.blob], a.name, { type: a.type }); });
+    btn.innerHTML = html; btn.disabled = false;
+    await navigator.share({ files: fs, title: 'Rendición de gastos ' + etiquetaRend(rendSel()), text: textoMail() });
+  } catch (e) { if (!(e && e.name === 'AbortError')) note($('mailNote'), 'err', 'No se pudo compartir.'); }
+  finally { btn.disabled = false; btn.innerHTML = html; }
 };
 
 /* ---------- borrar rendición ---------- */
@@ -807,7 +846,7 @@ function render() {
   if (S.view === 'nuevo') $('nRend').textContent = 'Rendición ' + etiquetaRend(rendSel());
 }
 (function initStatic() {
-  $('cCeco').value = '18 -  Sales'; $('cColab').value = 'CASTILLO MARTIN'; $('cMotivo').value = 'REPRESENTACIÓN COMERCIAL';
+  $('cCeco').value = '18 -  Sales'; $('cColab').value = 'CASTILLO MARTIN'; $('cMail').value = 'Martin.Castillo@heartlandfpg.com'; $('cMotivo').value = 'REPRESENTACIÓN COMERCIAL';
   renderChips(); actualizarMoneda(); renderInicio();
 })();
 (async function init() {
@@ -827,6 +866,7 @@ function render() {
       if (S.cfg.colaborador) $('cColab').value = S.cfg.colaborador;
       if (S.cfg.motivoBase) $('cMotivo').value = S.cfg.motivoBase;
       if (S.cfg.ceco) $('cCeco').value = S.cfg.ceco;
+      if (S.cfg.mail) $('cMail').value = S.cfg.mail;
       S.sel = S.cfg.sel || null; S.cfgGuardada = JSON.stringify(S.cfg);
       var ini = (S.cfg.colaborador || 'MC').split(/\s+/).map(function (w) { return w.charAt(0); }).reverse().join('').slice(0, 2);
       $('avatar').textContent = ini;

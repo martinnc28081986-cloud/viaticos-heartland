@@ -129,6 +129,41 @@
 
   window.claude = { use: async function (n) { await ready; return caps[n] || null; } };
 
+  // ---------- Envío por mail (Gmail API, desde la cuenta de Google del usuario) ----------
+  var gmailToken = null, gmailExp = 0;
+  async function tokenGmail(forzar) {
+    if (!forzar && gmailToken && Date.now() < gmailExp) return gmailToken;
+    var prov = new FB.GoogleAuthProvider();
+    prov.addScope('https://www.googleapis.com/auth/gmail.send');
+    prov.setCustomParameters({ login_hint: (user && user.email) || EMAIL_PERMITIDO });
+    var res = await FB.signInWithPopup(auth, prov);
+    var cred = FB.GoogleAuthProvider.credentialFromResult(res);
+    if (!cred || !cred.accessToken) throw new Error('Google no dio permiso para enviar mails');
+    gmailToken = cred.accessToken; gmailExp = Date.now() + 50 * 60 * 1000;
+    return gmailToken;
+  }
+  function b64(buf) { var s = '', b = new Uint8Array(buf); for (var i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
+  function b64utf8(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function lineas(s) { return s.replace(/(.{76})/g, '$1\r\n'); }
+  window.enviarMail = async function (msg) {
+    var bnd = 'viaticos_' + Date.now().toString(36);
+    var partes = ['To: ' + msg.to, 'Subject: =?UTF-8?B?' + b64utf8(msg.subject) + '?=', 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="' + bnd + '"', '',
+      '--' + bnd, 'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', lineas(b64utf8(msg.body))];
+    for (var i = 0; i < msg.files.length; i++) {
+      var f = msg.files[i], data = b64(await f.blob.arrayBuffer());
+      partes.push('--' + bnd, 'Content-Type: ' + f.type + '; name="' + f.name + '"', 'Content-Disposition: attachment; filename="' + f.name + '"', 'Content-Transfer-Encoding: base64', '', lineas(data));
+    }
+    partes.push('--' + bnd + '--', '');
+    var raw = partes.join('\r\n');
+    async function mandar(tk) {
+      return fetch('https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media', { method: 'POST', headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'message/rfc822' }, body: raw });
+    }
+    var r = await mandar(await tokenGmail(false));
+    if (r.status === 401 || r.status === 403) r = await mandar(await tokenGmail(true));
+    if (!r.ok) { var t = await r.text(); throw new Error('Gmail respondió ' + r.status + ': ' + t.slice(0, 160)); }
+    return true;
+  };
+
   // ---------- Login ----------
   function pantallaLogin(msg) {
     var el = document.getElementById('login');
