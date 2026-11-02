@@ -19,7 +19,8 @@ h1{font-size:19px;font-weight:600;margin:0}
 .mes{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--tx2)}
 input,select,button{font:inherit;color:inherit}
 input[type=text],input[type=number],input[type=date],input[type=month],select{width:100%;height:40px;padding:0 10px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
-.mes input{width:auto;height:34px}
+.mes select{width:auto;max-width:210px;height:34px;font-size:13px}
+.mes .ib{height:34px;white-space:nowrap}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:4px;margin-bottom:14px}
 .tabs button{border:0;background:none;padding:8px 2px;border-radius:7px;font-size:13px;color:var(--tx2);cursor:pointer}
 .tabs button.on{background:var(--acbg);color:var(--ac);font-weight:600}
@@ -80,7 +81,7 @@ input[type=text],input[type=number],input[type=date],input[type=month],select{wi
 <div class="wrap">
   <header>
     <h1>Viáticos <button id="btnSalir" class="ib hide" style="margin-left:6px;vertical-align:2px">Salir</button></h1>
-    <label class="mes">Mes a rendir <input type="month" id="mes"></label>
+    <div class="mes"><select id="rend" aria-label="Rendición"></select><button class="ib" id="btnNueva">+ Nueva</button></div>
   </header>
   <div id="login" class="card hide" style="text-align:center;padding:28px 16px">
     <div style="font-size:34px">🧾</div>
@@ -92,10 +93,27 @@ input[type=text],input[type=number],input[type=date],input[type=month],select{wi
   <div id="boot" class="note info"><span class="spin"></span>Conectando…</div>
   <div id="fatal" class="note err hide"></div>
 
+  <div id="nuevaRend" class="card hide">
+    <b style="font-size:15px">Nueva rendición</b>
+    <div class="chips" id="nrChips" style="margin-top:10px">
+      <button type="button" class="chip" data-t="mes">Mes</button>
+      <button type="button" class="chip" data-t="cierre">Hasta el cierre</button>
+      <button type="button" class="chip" data-t="15">15 días</button>
+      <button type="button" class="chip" data-t="7">Semana</button>
+      <button type="button" class="chip" data-t="libre">Desde / hasta</button>
+    </div>
+    <div class="row2">
+      <div><span class="lbl">Desde</span><input type="date" id="nrDesde"></div>
+      <div><span class="lbl">Hasta</span><input type="date" id="nrHasta"></div>
+    </div>
+    <div class="small" id="nrInfo" style="margin-top:6px"></div>
+    <div id="nrErr" class="note err hide"></div>
+    <div class="row2"><button class="btn" id="nrCancel">Cancelar</button><button class="btn pri" id="nrCrear">Crear rendición</button></div>
+  </div>
   <div id="calBanner" class="note hide" style="margin:0 0 12px"></div>
   <nav class="tabs" id="tabs">
     <button data-v="cargar" class="on">Cargar</button>
-    <button data-v="mes">Mi mes</button>
+    <button data-v="mes">Rendición</button>
     <button data-v="stats">Estadísticas</button>
     <button data-v="cerrar">Cerrar mes</button>
   </nav>
@@ -144,7 +162,7 @@ input[type=text],input[type=number],input[type=date],input[type=month],select{wi
         <div class="kpi"><span class="small" id="kMesLbl">Este mes</span><b id="kMes">$ 0</b><span class="small" id="kVar"></span></div>
         <div class="kpi"><span class="small">Promedio mensual</span><b id="kProm">$ 0</b><span class="small" id="kProm2"></span></div>
       </div>
-      <span class="lbl">Total por mes <span style="color:var(--tx3)">· tocá una barra para ver ese mes</span></span>
+      <span class="lbl">Total por mes (según la fecha de cada ticket) <span style="color:var(--tx3)">· tocá una barra</span></span>
       <div class="bars" id="bars"></div>
       <span class="lbl" id="porConcLbl">Por concepto</span>
       <div id="porConc"></div>
@@ -159,6 +177,7 @@ input[type=text],input[type=number],input[type=date],input[type=month],select{wi
       <div class="small" style="margin-top:4px">Va a quedar: <b id="motivoPrev"></b></div>
       <span class="lbl">Centro de costos</span>
       <select id="cCeco"></select>
+      <div class="small" id="rendEstado" style="margin-top:12px"></div>
       <div id="alertas"></div>
       <div id="calLista" class="small" style="margin-top:12px"></div>
       <div class="file"><span style="font-size:22px">📊</span><div class="i"><div id="nXlsx">—</div><div class="small">Reporte con una fila por grupo + detalle de tickets</div></div></div>
@@ -166,6 +185,7 @@ input[type=text],input[type=number],input[type=date],input[type=month],select{wi
       <div class="file"><span style="font-size:22px">📄</span><div class="i"><div id="nDocx">—</div><div class="small">Una página por grupo con las fotos de sus tickets</div></div></div>
       <button class="btn" id="dlDocx">Descargar Word</button>
       <div id="dlNote" class="note hide"></div>
+      <button class="btn" id="btnRendida">Marcar como rendida</button>
       <details style="margin-top:16px"><summary class="small" style="cursor:pointer">Respaldo de datos</summary>
         <p class="small">Baja o carga todos tus tickets con fotos (por ejemplo, para pasarlos a otra versión de la app).</p>
         <button class="btn" id="btnExport">Exportar todo</button>
@@ -199,8 +219,84 @@ function parseImporte(s) {
 function fmtImporte(n) { return (Number(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function note(el, cls, html) { el.className = 'note ' + cls; el.innerHTML = html; el.classList.remove('hide'); }
 function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
-function mesActual() { return $('mes').value || hoyMes(); }
-function ticketsMes() { var m = mesActual(); return S.tickets.filter(function (t) { return t.mes === m; }); }
+/* ---------- rendiciones (períodos) ---------- */
+function ultimoDia(m) { var p = m.split('-').map(Number); return m + '-' + String(new Date(p[0], p[1], 0).getDate()).padStart(2, '0'); }
+function sumarDias(iso, n) { var p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); }
+function rends() { return (S.cfg && S.cfg.rendiciones) || []; }
+function rendSel() { return rends().filter(function (r) { return r.id === S.sel; })[0] || null; }
+function esMesCompleto(r) { return r.desde.slice(8) === '01' && r.hasta === ultimoDia(r.desde.slice(0, 7)); }
+function ddmm(iso) { var p = iso.split('-'); return p[2] + '/' + p[1]; }
+function etiquetaRend(r) {
+  if (!r) return 'Sin rendición';
+  if (esMesCompleto(r)) { var p = r.desde.split('-'); return B.MESES_LARGO[Number(p[1]) - 1] + ' ' + p[0]; }
+  return ddmm(r.desde) + ' al ' + ddmm(r.hasta) + (r.desde.slice(0, 4) !== r.hasta.slice(0, 4) ? '/' + r.hasta.slice(2, 4) : '');
+}
+function mesActual() { var r = rendSel(); return r ? r.hasta.slice(0, 7) : hoyMes(); }
+function enRend(t, r) { return t.rend ? t.rend === r.id : ('m-' + t.mes) === r.id; }
+function ticketsMes() { var r = rendSel(); return r ? S.tickets.filter(function (t) { return enRend(t, r); }) : []; }
+function nombreArch(ext) {
+  var r = rendSel(); if (!r || esMesCompleto(r)) return B.nombreArchivo(mesActual(), ext);
+  var M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  var f = function (iso) { var p = iso.split('-'); return Number(p[2]) + M[Number(p[1]) - 1]; };
+  return 'Gastos_Martin_Castillo_' + f(r.desde) + '-' + f(r.hasta) + r.hasta.slice(2, 4) + '.' + ext;
+}
+// Crea rendiciones mensuales para tickets viejos (que solo tienen "mes")
+function asegurarRendiciones() {
+  var lista = rends().slice(), ids = {}, cambio = false;
+  lista.forEach(function (r) { ids[r.id] = 1; });
+  S.tickets.forEach(function (t) {
+    if (t.rend || !t.mes || ids['m-' + t.mes]) return;
+    ids['m-' + t.mes] = 1; cambio = true;
+    lista.push({ id: 'm-' + t.mes, tipo: 'mes', desde: t.mes + '-01', hasta: ultimoDia(t.mes), estado: t.mes < hoyMes() ? 'rendida' : 'abierta' });
+  });
+  if (cambio) { S.cfg = Object.assign({}, S.cfg, { rendiciones: lista }); }
+  if (!rendSel()) {
+    var orden = rends().slice().sort(function (a, b) { return a.hasta < b.hasta ? 1 : -1; });
+    var ab = orden.filter(function (r) { return r.estado !== 'rendida'; })[0];
+    S.sel = (ab || orden[0] || {}).id || null;
+    cambio = true;
+  }
+  if (cambio) guardarCfgYa();
+}
+function renderRendSelect() {
+  var sel = $('rend'), orden = rends().slice().sort(function (a, b) { return a.desde < b.desde ? 1 : -1; });
+  sel.innerHTML = orden.length ? orden.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(etiquetaRend(r)) + (r.estado === 'rendida' ? ' · rendida' : '') + '</option>'; }).join('') : '<option value="">Sin rendiciones</option>';
+  if (S.sel) sel.value = S.sel;
+}
+$('rend').addEventListener('change', function () { S.sel = this.value || null; S.statMes = null; guardarCfgYa(); render(); });
+var NR = { tipo: 'cierre' };
+function sugerirDesde() {
+  var orden = rends().slice().sort(function (a, b) { return a.hasta < b.hasta ? -1 : 1; });
+  var last = orden[orden.length - 1];
+  return last ? sumarDias(last.hasta, 1) : hoyMes() + '-01';
+}
+function calcularNR(cambioTipo) {
+  var d = $('nrDesde').value || sugerirDesde(), h;
+  if (NR.tipo === 'mes') { if (cambioTipo) d = d.slice(0, 7) + '-01'; h = ultimoDia(d.slice(0, 7)); }
+  else if (NR.tipo === 'cierre') { var c = CICLOS.filter(function (x) { return x[0] >= d; })[0]; h = c ? c[0] : sumarDias(d, 13); }
+  else if (NR.tipo === '15') h = sumarDias(d, 14);
+  else if (NR.tipo === '7') h = sumarDias(d, 6);
+  else h = $('nrHasta').value && $('nrHasta').value >= d ? $('nrHasta').value : sumarDias(d, 6);
+  $('nrDesde').value = d; $('nrHasta').value = h;
+  [].forEach.call($('nrChips').children, function (b) { b.classList.toggle('on', b.dataset.t === NR.tipo); });
+  var c2 = NR.tipo === 'cierre' ? CICLOS.filter(function (x) { return x[0] === h; })[0] : null;
+  $('nrInfo').textContent = c2 ? 'Cierre de carga ' + fCorta(c2[0]) + ' · pago ' + fCorta(c2[2]) : (NR.tipo === 'cierre' ? 'No hay fecha de cierre en el calendario: toma 14 días.' : '');
+}
+$('btnNueva').onclick = function () {
+  NR.tipo = 'cierre'; $('nrDesde').value = ''; $('nrHasta').value = ''; $('nrErr').classList.add('hide');
+  calcularNR(true); $('nuevaRend').classList.remove('hide'); window.scrollTo(0, 0);
+};
+$('nrChips').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; NR.tipo = b.dataset.t; calcularNR(true); });
+$('nrDesde').addEventListener('change', function () { calcularNR(false); });
+$('nrHasta').addEventListener('change', function () { NR.tipo = 'libre'; calcularNR(false); });
+$('nrCancel').onclick = function () { $('nuevaRend').classList.add('hide'); };
+$('nrCrear').onclick = function () {
+  var d = $('nrDesde').value, h = $('nrHasta').value;
+  if (!d || !h || h < d) { note($('nrErr'), 'err', 'Revisá las fechas: "hasta" tiene que ser igual o posterior a "desde".'); return; }
+  var r = { id: 'r' + Date.now().toString(36), tipo: NR.tipo, desde: d, hasta: h, estado: 'abierta', creada: new Date().toISOString() };
+  S.cfg = Object.assign({}, S.cfg, { rendiciones: rends().concat([r]) }); S.sel = r.id; S.statMes = null;
+  guardarCfgYa(); $('nuevaRend').classList.add('hide'); render();
+};
 function imgUrl(t) { return t.assetId ? '/_blob/' + t.assetId : ''; }
 function fotoDe(t) { return window.Fotos ? window.Fotos.get(t.assetId) : Promise.resolve(imgUrl(t)); }
 
@@ -300,12 +396,13 @@ $('cancelEdit').onclick = function (e) { e.preventDefault(); resetForm(); };
 
 $('guardar').addEventListener('click', async function () {
   var imp = parseImporte($('fImporte').value), fecha = $('fFecha').value;
-  var err = !S.blob && !S.editId ? 'Sacá o subí la foto del ticket.' : !fecha ? 'Falta la fecha.' : !(imp > 0) ? 'Falta el importe (ej: 98450,00).' : !S.grupo ? 'Elegí el concepto.' : '';
+  var err = !S.editId && !rendSel() ? 'Primero creá una rendición con "+ Nueva".' : !S.blob && !S.editId ? 'Sacá o subí la foto del ticket.' : !fecha ? 'Falta la fecha.' : !(imp > 0) ? 'Falta el importe (ej: 98450,00).' : !S.grupo ? 'Elegí el concepto.' : '';
   if (err) { note($('formErr'), 'err', err); return; }
   if (!S.tkCol) { note($('formErr'), 'err', 'No hay conexión con tu almacenamiento. Recargá la página.'); return; }
   var btn = this; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Guardando…';
   try {
     var data = { fecha: fecha, importe: B.round2(imp), proveedor: $('fProv').value.trim(), grupo: S.grupo };
+    if (S.editId) { var orig = S.tickets.filter(function (t) { return t.id === S.editId; })[0] || {}; if (!orig.rend && orig.mes) data.rend = 'm-' + orig.mes; data.mes = fecha.slice(0, 7); }
     if (S.editId) {
       var old = S.tickets.filter(function (t) { return t.id === S.editId; })[0] || {};
       var upd = Object.assign({}, data);
@@ -315,7 +412,7 @@ $('guardar').addEventListener('click', async function () {
       $('lastSaved').textContent = 'Ticket actualizado.';
     } else {
       var a = await S.assets.upload(S.blob);
-      data.assetId = a.id; data.w = S.dims.w; data.h = S.dims.h; data.mes = mesActual(); data.creado = new Date().toISOString();
+      data.assetId = a.id; data.w = S.dims.w; data.h = S.dims.h; data.rend = S.sel; data.mes = fecha.slice(0, 7); data.creado = new Date().toISOString();
       await S.tkCol.add(data);
       $('lastSaved').textContent = 'Guardado: ' + B.grupoDe(data.grupo).label + ' · $ ' + fmtImporte(data.importe) + '. Podés cargar el siguiente.';
     }
@@ -329,11 +426,10 @@ $('guardar').addEventListener('click', async function () {
 function renderMes() {
   var ts = ticketsMes(), gs = B.agrupar(ts);
   var tot = gs.reduce(function (s, g) { return s + g.total; }, 0);
-  var p = mesActual().split('-');
-  $('totLbl').textContent = 'Total a rendir · ' + B.MESES_LARGO[Number(p[1]) - 1] + ' ' + p[0] + ' · ' + ts.length + (ts.length === 1 ? ' ticket' : ' tickets');
+  $('totLbl').textContent = 'Total a rendir · ' + etiquetaRend(rendSel()) + ' · ' + ts.length + (ts.length === 1 ? ' ticket' : ' tickets');
   $('totVal').textContent = B.money(tot);
   var box = $('grupos'); box.innerHTML = '';
-  if (!gs.length) { box.innerHTML = '<div class="empty">Todavía no cargaste tickets en este mes.</div>'; return; }
+  if (!gs.length) { box.innerHTML = (rendSel() ? '<div class="empty">Todavía no cargaste tickets en esta rendición.</div>' : '<div class="empty">Creá tu primera rendición con "+ Nueva".</div>'); return; }
   gs.forEach(function (gr) {
     var d = document.createElement('div'); d.className = 'grp';
     var open = !!S.open[gr.grupo.id];
@@ -370,16 +466,20 @@ function editar(t) {
 
 /* ---------- cerrar ---------- */
 function motivoCompleto() {
-  var p = mesActual().split('-');
-  return ($('cMotivo').value.trim() + ' ' + B.MESES_LARGO[Number(p[1]) - 1].toUpperCase() + ' ' + p[0].slice(2)).trim();
+  var r = rendSel(), base = $('cMotivo').value.trim();
+  if (!r || esMesCompleto(r)) { var p = mesActual().split('-'); return (base + ' ' + B.MESES_LARGO[Number(p[1]) - 1].toUpperCase() + ' ' + p[0].slice(2)).trim(); }
+  return (base + ' ' + ddmm(r.desde) + ' AL ' + ddmm(r.hasta) + '/' + r.hasta.slice(2, 4)).trim();
 }
 function renderCerrar() {
   $('motivoPrev').textContent = motivoCompleto();
-  var m = mesActual(), ts = ticketsMes(), al = [];
-  $('nXlsx').textContent = B.nombreArchivo(m, 'xlsx'); $('nDocx').textContent = B.nombreArchivo(m, 'docx');
-  if (!ts.length) al.push(['warn', 'No hay tickets cargados en este mes.']);
-  var fuera = ts.filter(function (t) { return t.fecha && t.fecha.slice(0, 7) !== m; });
-  if (fuera.length) al.push(['warn', fuera.length + (fuera.length === 1 ? ' ticket tiene' : ' tickets tienen') + ' fecha fuera del mes: ' + fuera.map(function (t) { return B.fechaAR(t.fecha) + ' (' + B.money(t.importe) + ')'; }).join(', ')]);
+  var R = rendSel(), ts = ticketsMes(), al = [];
+  $('nXlsx').textContent = nombreArch('xlsx'); $('nDocx').textContent = nombreArch('docx');
+  $('rendEstado').innerHTML = R ? '<b>' + esc(etiquetaRend(R)) + '</b> · ' + (R.estado === 'rendida' ? 'rendida' : 'abierta') : 'Sin rendición';
+  $('btnRendida').textContent = R && R.estado === 'rendida' ? 'Reabrir rendición' : 'Marcar como rendida';
+  $('btnRendida').disabled = !R;
+  if (!ts.length) al.push(['warn', 'No hay tickets cargados en esta rendición.']);
+  var fuera = R ? ts.filter(function (t) { return t.fecha && (t.fecha < R.desde || t.fecha > R.hasta); }) : [];
+  if (fuera.length) al.push(['warn', fuera.length + (fuera.length === 1 ? ' ticket tiene' : ' tickets tienen') + ' fecha fuera del período: ' + fuera.map(function (t) { return B.fechaAR(t.fecha) + ' (' + B.money(t.importe) + ')'; }).join(', ')]);
   var vistos = {}, dup = [];
   ts.forEach(function (t) { var k = t.fecha + '|' + B.round2(t.importe); if (vistos[k]) dup.push(t); vistos[k] = 1; });
   if (dup.length) al.push(['warn', 'Posible ticket repetido: ' + dup.map(function (t) { return B.fechaAR(t.fecha) + ' ' + B.money(t.importe); }).join(', ') + '. Revisalo en "Mi mes".']);
@@ -390,22 +490,27 @@ function renderCerrar() {
   if (!S.downloads) note($('dlNote'), 'warn', 'Las descargas no están disponibles en esta vista. Probá desde otro navegador.');
 }
 var cfgTimer = null;
-function guardarCfg() {
+function guardarCfgYa() {
   clearTimeout(cfgTimer);
-  cfgTimer = setTimeout(function () {
-    if (!S.cfgRef) return;
-    var c = { colaborador: $('cColab').value.trim(), motivoBase: $('cMotivo').value.trim(), ceco: $('cCeco').value, mes: mesActual() };
-    if (JSON.stringify(c) === JSON.stringify(S.cfg)) return;
-    S.cfg = c; S.cfgRef.set(c).catch(function () {});
-  }, 700);
+  if (!S.cfgRef) return;
+  var c = { colaborador: $('cColab').value.trim(), motivoBase: $('cMotivo').value.trim(), ceco: $('cCeco').value, rendiciones: rends(), sel: S.sel || null };
+  if (JSON.stringify(c) === S.cfgGuardada) return;
+  S.cfg = c; S.cfgGuardada = JSON.stringify(c); S.cfgRef.set(c).catch(function () {});
 }
+function guardarCfg() { clearTimeout(cfgTimer); cfgTimer = setTimeout(guardarCfgYa, 700); }
+$('btnRendida').onclick = function () {
+  var R = rendSel(); if (!R) return;
+  S.cfg = Object.assign({}, S.cfg, { rendiciones: rends().map(function (r) { return r.id === R.id ? Object.assign({}, r, { estado: r.estado === 'rendida' ? 'abierta' : 'rendida', rendidaEl: r.estado === 'rendida' ? null : new Date().toISOString().slice(0, 10) }) : r; }) });
+  guardarCfgYa(); render();
+  if (rendSel().estado === 'rendida') note($('dlNote'), 'ok', '✓ Rendición marcada como rendida. Para la próxima tocá "+ Nueva" arriba.');
+};
 ['cColab', 'cMotivo'].forEach(function (id) { $(id).addEventListener('input', guardarCfg); });
 $('cMotivo').addEventListener('input', function () { $('motivoPrev').textContent = motivoCompleto(); });
 $('cCeco').addEventListener('change', guardarCfg);
-$('mes').addEventListener('change', function () { guardarCfg(); render(); });
+
 
 function datosExport() {
-  return { tickets: ticketsMes().map(function (t) { return Object.assign({}, t); }), colaborador: $('cColab').value.trim(), motivo: motivoCompleto(), ceco: $('cCeco').value };
+  return { periodo: etiquetaRend(rendSel()), tickets: ticketsMes().map(function (t) { return Object.assign({}, t); }), colaborador: $('cColab').value.trim(), motivo: motivoCompleto(), ceco: $('cCeco').value };
 }
 async function guardarArchivo(btn, nombre, crear) {
   var txt = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Armando archivo…';
@@ -420,7 +525,7 @@ async function guardarArchivo(btn, nombre, crear) {
   } finally { btn.disabled = false; btn.textContent = txt; }
 }
 $('dlXlsx').onclick = function () {
-  guardarArchivo(this, B.nombreArchivo(mesActual(), 'xlsx'), async function () {
+  guardarArchivo(this, nombreArch('xlsx'), async function () {
     if (!window.PLANTILLA_B64) throw new Error('no se cargó la plantilla');
     var bin = atob(window.PLANTILLA_B64), tpl = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) tpl[i] = bin.charCodeAt(i);
@@ -431,7 +536,7 @@ $('dlXlsx').onclick = function () {
 };
 function blobToDataURL(b) { return new Promise(function (res, rej) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = rej; fr.readAsDataURL(b); }); }
 $('dlDocx').onclick = function () {
-  guardarArchivo(this, B.nombreArchivo(mesActual(), 'docx'), async function () {
+  guardarArchivo(this, nombreArch('docx'), async function () {
     var d = datosExport(), imgs = {};
     d.mes = mesActual();
     for (var i = 0; i < d.tickets.length; i++) {
@@ -505,7 +610,11 @@ $('fileImport').addEventListener('change', async function () {
       }
       await S.tkCol.doc(id).set(t); n++;
     }
-    if (data.config && (data.config.colaborador || data.config.motivoBase) && S.cfgRef) { await S.cfgRef.set(Object.assign({}, S.cfg, data.config)); }
+    if (data.config && Array.isArray(data.config.rendiciones)) {
+      var ids = {}; rends().forEach(function (r) { ids[r.id] = 1; });
+      S.cfg = Object.assign({}, S.cfg, { rendiciones: rends().concat(data.config.rendiciones.filter(function (r) { return r && r.id && !ids[r.id]; })) });
+    }
+    asegurarRendiciones(); guardarCfgYa(); render();
     note($('bkNote'), 'ok', '✓ Importados ' + n + ' tickets' + (saltados ? ' (' + saltados + ' ya estaban)' : '') + '.');
   } catch (e) { note($('bkNote'), 'err', 'No se pudo importar ese archivo.'); }
 });
@@ -514,7 +623,7 @@ $('fileImport').addEventListener('change', async function () {
 /* ---------- estadísticas ---------- */
 function totalesPorMes() {
   var m = {};
-  S.tickets.forEach(function (t) { if (!t.mes) return; m[t.mes] = m[t.mes] || { total: 0, n: 0, grupos: {} }; var v = Number(t.importe) || 0; m[t.mes].total += v; m[t.mes].n++; m[t.mes].grupos[t.grupo || 'OTROS'] = (m[t.mes].grupos[t.grupo || 'OTROS'] || 0) + v; });
+  S.tickets.forEach(function (t) { var k = (t.fecha || '').slice(0, 7) || t.mes; if (!k) return; m[k] = m[k] || { total: 0, n: 0, grupos: {} }; var v = Number(t.importe) || 0; m[k].total += v; m[k].n++; m[k].grupos[t.grupo || 'OTROS'] = (m[k].grupos[t.grupo || 'OTROS'] || 0) + v; });
   return m;
 }
 function mesAnterior(m) { var p = m.split('-').map(Number); p[1]--; if (!p[1]) { p[1] = 12; p[0]--; } return p[0] + '-' + String(p[1]).padStart(2, '0'); }
@@ -522,7 +631,7 @@ function nombreMes(m, corto) { var p = m.split('-'); var n = B.MESES_LARGO[Numbe
 function kfmt(n) { return n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + 'M' : Math.round(n / 1000) + 'k'; }
 function pct(a, b) { if (!b) return null; return Math.round((a - b) / b * 100); }
 function renderStats() {
-  var tm = totalesPorMes(), mes = mesActual(), prev = mesAnterior(mes);
+  var tm = totalesPorMes(), mes = S.statMes || mesActual(), prev = mesAnterior(mes);
   var meses = Object.keys(tm).sort();
   var cur = tm[mes] || { total: 0, n: 0, grupos: {} }, ant = tm[prev];
   $('kMesLbl').textContent = nombreMes(mes);
@@ -545,7 +654,7 @@ function renderStats() {
   $('bars').insertAdjacentHTML('afterend', '');
   var lbl = $('barLbl'); if (!lbl) { lbl = document.createElement('div'); lbl.id = 'barLbl'; lbl.className = 'barlbl'; $('bars').after(lbl); }
   lbl.innerHTML = lista.map(function (x) { return '<span>' + nombreMes(x, true) + '</span>'; }).join('');
-  [].forEach.call($('bars').children, function (b) { b.onclick = function () { $('mes').value = b.dataset.m; guardarCfg(); render(); }; });
+  [].forEach.call($('bars').children, function (b) { b.onclick = function () { S.statMes = b.dataset.m; renderStats(); }; });
   // por concepto
   $('porConcLbl').textContent = 'Por concepto · ' + nombreMes(mes) + (ant ? ' vs ' + nombreMes(prev, true) : '');
   var gs = B.GRUPOS.filter(function (g) { return cur.grupos[g.id] || (ant && ant.grupos[g.id]); })
@@ -560,6 +669,7 @@ function renderStats() {
 
 /* ---------- render ---------- */
 function render() {
+  renderRendSelect();
   if (S.view === 'mes') renderMes();
   if (S.view === 'cerrar') renderCerrar();
   if (S.view === 'stats') renderStats();
@@ -569,7 +679,6 @@ function render() {
 (function initStatic() {
   $('cCeco').innerHTML = CECOS.map(function (c) { return '<option value="' + esc(c).replace(/"/g, '&quot;') + '">' + esc(c) + '</option>'; }).join('');
   $('cCeco').value = '18 -  Sales'; $('cColab').value = 'CASTILLO MARTIN'; $('cMotivo').value = 'REPRESENTACIÓN COMERCIAL';
-  $('mes').value = hoyMes();
   renderChips();
   renderCalendario();
 })();
@@ -591,7 +700,7 @@ function render() {
       if (S.cfg.colaborador) $('cColab').value = S.cfg.colaborador;
       if (S.cfg.motivoBase) $('cMotivo').value = S.cfg.motivoBase;
       if (S.cfg.ceco) $('cCeco').value = S.cfg.ceco;
-      if (S.cfg.mes) $('mes').value = S.cfg.mes;
+      S.sel = S.cfg.sel || null; S.cfgGuardada = JSON.stringify(S.cfg);
     }
   } catch (e) {}
   // Tickets que Claude dejó para importar (p. ej. meses anteriores): se copian a tu espacio privado
@@ -606,6 +715,7 @@ function render() {
   S.tkCol.onSnapshot(function (snap) {
     if (!snap.metadata.fromCache) { clearTimeout(timer); $('boot').classList.add('hide'); }
     S.tickets = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+    asegurarRendiciones();
     render();
   }, function (e) { clearTimeout(timer); $('boot').classList.add('hide'); note($('fatal'), 'err', 'Se perdió la conexión con tus datos. Recargá la página.'); });
 })();

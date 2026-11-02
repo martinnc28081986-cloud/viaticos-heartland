@@ -113,7 +113,7 @@
     var MAXW = 290, MAXH = 400; // px
     var children = [];
     var mes = data.mes ? data.mes.split('-') : null;
-    children.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Comprobantes de gastos' + (mes ? ' – ' + MESES_LARGO[Number(mes[1]) - 1] + ' ' + mes[0] : ''), bold: true, size: 32, font: 'Calibri' })] }));
+    children.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Comprobantes de gastos' + (data.periodo ? ' – ' + data.periodo : mes ? ' – ' + MESES_LARGO[Number(mes[1]) - 1] + ' ' + mes[0] : ''), bold: true, size: 32, font: 'Calibri' })] }));
     var tot = round2(grupos.reduce(function (a, g) { return a + g.total; }, 0));
     children.push(new D.Paragraph({ spacing: { after: 200 }, children: [new D.TextRun({ text: (data.colaborador || '') + (data.motivo ? ' · ' + data.motivo : '') + ' · Total ' + money(tot), size: 20, color: '595959', font: 'Calibri' })] }));
     grupos.forEach(function (gr, gi) {
