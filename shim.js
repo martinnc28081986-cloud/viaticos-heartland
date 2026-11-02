@@ -193,15 +193,17 @@
       var prov = new FB.GoogleAuthProvider(); prov.setCustomParameters({ prompt: 'select_account' });
       try { await FB.signInWithPopup(auth, prov); }
       catch (e) {
-        if (e && /popup/i.test(e.code || '')) { try { await FB.signInWithRedirect(auth, prov); } catch (e2) { pantallaLogin('No se pudo iniciar sesión.'); } }
-        else pantallaLogin('No se pudo iniciar sesión.');
+        var c = (e && e.code) || String(e);
+        if (/popup-closed|cancelled-popup/.test(c)) pantallaLogin('Se cerró la ventana de Google antes de terminar. Tocá "Entrar con Google" de nuevo y elegí tu cuenta.');
+        else if (/popup-blocked/.test(c)) pantallaLogin('El navegador bloqueó la ventana de Google. Permití ventanas emergentes para este sitio y probá de nuevo.');
+        else pantallaLogin('No se pudo iniciar sesión (' + c + ').');
       }
     };
     function salir() { FB.signOut(auth).then(function () { location.reload(); }); }
     document.getElementById('btnSalir').onclick = salir;
     document.getElementById('btnSalirLogin').onclick = salir;
   });
-  FB.getRedirectResult(auth).catch(function () {});
+  FB.getRedirectResult(auth).catch(function (e) { if (e && e.code && !/no-auth-event/.test(e.code)) pantallaLogin('No se pudo iniciar sesión (' + e.code + ').'); });
   var entro = false, desuscribir = null;
   function entrar(u) {
     if (entro) return; entro = true;
