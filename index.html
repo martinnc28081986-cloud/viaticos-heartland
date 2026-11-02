@@ -236,6 +236,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
         <label class="field"><span>Centro de costos</span><select id="cCeco"></select></label>
       </div>
       <div id="alertas"></div>
+      <div class="card hide" id="cuitCard"><b style="display:flex;align-items:center;gap:6px"><span class="ms" style="color:var(--ac)">badge</span>Faltan CUIT en algunos tickets</b><p class="sub" style="margin:6px 0 10px">La IA relee las fotos y completa el CUIT y la razón social para el Excel.</p><button class="btn pri" id="btnCuit" style="margin:0"><span class="ms">auto_fix_high</span><span id="cuitTxt">Completar CUIT</span></button><div id="cuitNote" class="note hide"></div></div>
       <div class="card">
         <div class="file"><span class="ms" style="color:#1E7B45">table_view</span><div style="flex:1"><div id="nXlsx">—</div><div class="sub">Una fila por día y concepto, ordenadas por fecha</div></div></div>
         <button class="btn pri" id="dlXlsx"><span class="ms">download</span>Descargar Excel</button>
@@ -283,7 +284,8 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
         <div class="frow hide" id="rowTc"><label for="fTc">Tipo de cambio</label><span class="sub" id="tcLbl" style="flex:1">$ por 1</span><input type="text" inputmode="decimal" id="fTc" placeholder="0,00" style="width:110px"></div>
         <div class="frow hide" id="rowArs"><label>En pesos</label><span style="flex:1"></span><b id="fArs" class="amt">$ 0,00</b></div>
         <div class="frow"><label for="fFecha">Fecha</label><input type="date" id="fFecha"></div>
-        <div class="frow"><label for="fProv">Proveedor</label><input type="text" id="fProv" placeholder="YPF Ruta 2"></div>
+        <div class="frow"><label for="fProv">Razón social</label><input type="text" id="fProv" placeholder="YPF S.A."></div>
+        <div class="frow"><label for="fCuit">CUIT</label><input type="text" id="fCuit" inputmode="numeric" placeholder="30-54668997-9"></div>
       </div>
       <div class="sect"><span>Concepto</span></div>
       <div class="chips" id="chips"></div>
@@ -304,9 +306,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=16"></script>
-<script src="shim.js?v=16"></script>
-<script src="builders.js?v=16"></script>
+<script src="fb.bundle.js?v=17"></script>
+<script src="shim.js?v=17"></script>
+<script src="builders.js?v=17"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -474,14 +476,16 @@ async function leerTicket() {
   var prompt = 'La imagen es un ticket, factura o comprobante de pago (o captura de un pago, p. ej. TelePASE/peaje, estacionamiento, combustible, comida, hotel, taxi). ' +
     'Puede ser de Argentina o de otro país. Extraé los datos. En Argentina los importes usan punto para miles y coma para decimales ("98.450,00" = 98450.00). ' +
     'El importe es el TOTAL pagado (si hay varios movimientos, la suma). La moneda es la del comprobante: ARS si es de Argentina en pesos; si no, la que corresponda. ' +
-    'Respondé SOLO con un objeto JSON: {"fecha":"YYYY-MM-DD" o null,"proveedor":"nombre corto" o null,"importe":número o null,"moneda":uno de [' + monedas + '],"grupo":uno de [' + grupos + '] o null}. ' +
-    'Ejemplo: {"fecha":"2026-10-14","proveedor":"YPF","importe":98450,"moneda":"ARS","grupo":"COMBUSTIBLE"}';
+    PROMPT_CUIT +
+    'Respondé SOLO con un objeto JSON: {"fecha":"YYYY-MM-DD" o null,"proveedor":"razón social" o null,"cuit":"XX-XXXXXXXX-X" o null,"importe":número o null,"moneda":uno de [' + monedas + '],"grupo":uno de [' + grupos + '] o null}. ' +
+    'Ejemplo: {"fecha":"2026-10-14","proveedor":"YPF S.A.","cuit":"30-54668997-9","importe":98450,"moneda":"ARS","grupo":"COMBUSTIBLE"}';
   try {
     var r = await S.sample.json(prompt, { images: [S.blob], signal: ctl.signal });
     if (ctl.signal.aborted) return;
     var libre = function (id) { return !$(id).dataset.touched; }, leidos = [];
     if (r && r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) { leidos.push('fecha'); if (libre('fFecha')) $('fFecha').value = r.fecha; }
-    if (r && r.proveedor) { leidos.push('proveedor'); if (libre('fProv')) $('fProv').value = String(r.proveedor).slice(0, 80); }
+    if (r && fmtCuit(r.cuit)) { leidos.push('CUIT'); if (libre('fCuit')) $('fCuit').value = fmtCuit(r.cuit); }
+    if (r && r.proveedor) { leidos.push('razón social'); if (libre('fProv')) $('fProv').value = String(r.proveedor).slice(0, 80); }
     if (r && r.importe != null && !isNaN(Number(r.importe))) { leidos.push('importe'); if (libre('fImporte')) $('fImporte').value = B.fmtNum(r.importe); }
     if (r && r.moneda && B.MONEDAS.some(function (m) { return m.code === r.moneda; }) && libre('fMoneda')) { $('fMoneda').value = r.moneda; if (r.moneda !== 'ARS') leidos.push('moneda ' + r.moneda); }
     if (r && r.grupo && B.PRINCIPALES.some(function (g) { return g.id === r.grupo; }) && !S.grupo) { S.grupo = r.grupo; renderChips(); }
@@ -498,12 +502,12 @@ async function leerTicket() {
     if (e && (e.code === 'not_granted' || e.code === 'images_unavailable' || e.code === 'sampling_disabled')) S.sample = null;
   }
 }
-['fFecha', 'fImporte', 'fProv', 'fTc'].forEach(function (id) { $(id).addEventListener('input', function () { this.dataset.touched = '1'; }); });
+['fFecha', 'fImporte', 'fProv', 'fCuit', 'fTc'].forEach(function (id) { $(id).addEventListener('input', function () { this.dataset.touched = '1'; }); });
 function resetForm() {
   S.blob = null; S.dims = null; S.editId = null; S.grupo = null;
   if (S.readCtl) S.readCtl.abort();
   $('preview').classList.add('hide'); $('preview').removeAttribute('src'); $('picker').classList.remove('hide'); $('otraFoto').classList.add('hide');
-  ['fFecha', 'fImporte', 'fProv', 'fTc'].forEach(function (id) { $(id).value = ''; delete $(id).dataset.touched; });
+  ['fFecha', 'fImporte', 'fProv', 'fCuit', 'fTc'].forEach(function (id) { $(id).value = ''; delete $(id).dataset.touched; });
   $('fMoneda').value = 'ARS'; delete $('fMoneda').dataset.touched;
   ['readNote', 'formErr', 'borrar'].forEach(function (id) { $(id).classList.add('hide'); });
   $('nTitulo').textContent = 'Nuevo gasto'; $('guardar').textContent = 'Guardar gasto'; $('lastSaved').textContent = '';
@@ -511,9 +515,9 @@ function resetForm() {
 }
 function editar(t) {
   resetForm(); S.editId = t.id; S.grupo = t.grupo;
-  $('fFecha').value = t.fecha || ''; $('fImporte').value = B.fmtNum(t.importe); $('fProv').value = t.proveedor || '';
+  $('fFecha').value = t.fecha || ''; $('fImporte').value = B.fmtNum(t.importe); $('fProv').value = t.proveedor || ''; $('fCuit').value = t.cuit || '';
   $('fMoneda').value = t.moneda || 'ARS'; $('fTc').value = t.moneda && t.moneda !== 'ARS' && t.tc ? B.fmtNum(t.tc) : '';
-  ['fFecha', 'fImporte', 'fProv', 'fTc', 'fMoneda'].forEach(function (id) { $(id).dataset.touched = '1'; });
+  ['fFecha', 'fImporte', 'fProv', 'fCuit', 'fTc', 'fMoneda'].forEach(function (id) { $(id).dataset.touched = '1'; });
   if (t.assetId) fotoDe(t).then(function (u) { if (u) mostrarFoto(u); });
   $('nTitulo').textContent = 'Editar gasto'; $('guardar').textContent = 'Guardar cambios'; $('borrar').classList.remove('hide');
   actualizarMoneda(); renderChips(); setView('nuevo', S.view === 'nuevo' ? S.back : S.view);
@@ -526,7 +530,7 @@ $('guardar').addEventListener('click', async function () {
   if (!S.tkCol) { note($('formErr'), 'err', 'No hay conexión con tu almacenamiento. Recargá la página.'); return; }
   var btn = this; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Guardando…';
   try {
-    var data = { fecha: fecha, importe: B.round2(imp), moneda: mon, tc: mon === 'ARS' ? 1 : tc, proveedor: $('fProv').value.trim(), grupo: S.grupo, mes: fecha.slice(0, 7) };
+    var data = { fecha: fecha, importe: B.round2(imp), moneda: mon, tc: mon === 'ARS' ? 1 : tc, proveedor: $('fProv').value.trim(), cuit: fmtCuit($('fCuit').value) || $('fCuit').value.trim(), grupo: S.grupo, mes: fecha.slice(0, 7) };
     if (mon !== 'ARS') { var tcs = Object.assign({}, S.cfg.tcs || {}); tcs[mon] = tc; S.cfg = Object.assign({}, S.cfg, { tcs: tcs }); guardarCfgYa(); }
     if (S.editId) {
       var old = S.tickets.filter(function (t) { return t.id === S.editId; })[0] || {};
@@ -670,6 +674,7 @@ function motivoCompleto() {
   return (base + ' ' + ddmm(r.desde) + ' AL ' + ddmm(r.hasta) + '/' + r.hasta.slice(2, 4)).trim();
 }
 function renderEnviar() {
+  renderBtnCuit();
   var R = rendSel(), ts = ticketsMes(), al = [];
   $('eRend').textContent = etiquetaRend(R);
   $('eSub').textContent = R ? plural(ts.length, 'gasto', 'gastos') + ' · total ' + B.money(totalArs(ts)) + ' · ' + (R.estado === 'rendida' ? 'rendida' : 'abierta') : '';
@@ -875,6 +880,41 @@ function renderStats() {
   }).join('') : '<div class="empty">No hay gastos en este mes.</div>';
 }
 
+
+/* ---------- CUIT y razón social ---------- */
+var PROMPT_CUIT = 'Razón social: el nombre legal del comercio que EMITE el comprobante (ej. "YPF S.A.", "AUSOL S.A.", "Pérez Juan"), tal como figura impreso. ' +
+  'CUIT: el del comercio emisor (11 dígitos, formato XX-XXXXXXXX-X). Si aparece también el CUIT del cliente o comprador, NO lo uses. Si no se ve, null. ';
+function fmtCuit(v) { var d = String(v || '').replace(/\D/g, ''); return d.length === 11 ? d.slice(0, 2) + '-' + d.slice(2, 10) + '-' + d.slice(10) : ''; }
+function sinCuit(ts) { return ts.filter(function (t) { return !t.cuit && t.assetId && !t.cuitBuscado; }); }
+function renderBtnCuit() {
+  var n = sinCuit(ticketsMes()).length;
+  $('cuitCard').classList.toggle('hide', !n || !S.sample);
+  $('cuitTxt').textContent = 'Completar CUIT y razón social (' + plural(n, 'ticket', 'tickets') + ')';
+}
+$('btnCuit').onclick = async function () {
+  var btn = this, ts = sinCuit(ticketsMes()), ok = 0, falt = 0;
+  btn.disabled = true;
+  for (var i = 0; i < ts.length; i++) {
+    $('cuitTxt').textContent = 'Leyendo ' + (i + 1) + ' de ' + ts.length + '…';
+    var t = ts[i], r = null;
+    try {
+      var url = await window.Fotos.get(t.assetId); if (!url) { falt++; continue; }
+      var blob = await (await fetch(url)).blob();
+      for (var intento = 0; intento < 3 && !r; intento++) {
+        try { r = await S.sample.json('La imagen es un ticket o comprobante de Argentina. ' + PROMPT_CUIT + 'Respondé SOLO con JSON: {"proveedor":"razón social" o null,"cuit":"XX-XXXXXXXX-X" o null}', { images: [blob] }); }
+        catch (e) { if (e && e.code === 'rate_limited') await new Promise(function (ok2) { setTimeout(ok2, 20000); }); else throw e; }
+      }
+      var up = { cuitBuscado: true }, c = r && fmtCuit(r.cuit);
+      if (c) { up.cuit = c; ok++; } else falt++;
+      if (r && r.proveedor) up.proveedor = String(r.proveedor).slice(0, 80);
+      await S.tkCol.doc(t.id).update(up);
+    } catch (e) { falt++; }
+    await new Promise(function (ok3) { setTimeout(ok3, 1500); });
+  }
+  btn.disabled = false;
+  note($('cuitNote'), ok ? 'ok' : 'warn', '✓ Completé ' + plural(ok, 'ticket', 'tickets') + (falt ? '. En ' + plural(falt, 'ticket', 'tickets') + ' no se ve el CUIT: si lo necesitás, cargalo a mano editando el gasto.' : '.'));
+  renderBtnCuit();
+};
 
 /* ---------- alta de usuarios ---------- */
 function mostrarOnb() {
