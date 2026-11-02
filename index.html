@@ -20,8 +20,8 @@ h1{font-size:19px;font-weight:600;margin:0}
 input,select,button{font:inherit;color:inherit}
 input[type=text],input[type=number],input[type=date],input[type=month],select{width:100%;height:40px;padding:0 10px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
 .mes input{width:auto;height:34px}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:4px;margin-bottom:14px}
-.tabs button{border:0;background:none;padding:8px 4px;border-radius:7px;font-size:14px;color:var(--tx2);cursor:pointer}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:4px;margin-bottom:14px}
+.tabs button{border:0;background:none;padding:8px 2px;border-radius:7px;font-size:13px;color:var(--tx2);cursor:pointer}
 .tabs button.on{background:var(--acbg);color:var(--ac);font-weight:600}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
 .drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:150px;border:1.5px dashed var(--bd);border-radius:10px;color:var(--tx2);cursor:pointer;text-align:center;padding:10px;overflow:hidden}
@@ -54,6 +54,20 @@ input[type=text],input[type=number],input[type=date],input[type=month],select{wi
 .file{display:flex;gap:10px;align-items:center;border:1px solid var(--bd);border-radius:10px;padding:10px;margin-top:10px}
 .file .i{flex:1;font-size:13px}
 .empty{text-align:center;color:var(--tx2);padding:18px 6px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi{background:var(--bg);border-radius:10px;padding:10px}
+.kpi b{display:block;font-size:20px;font-weight:600;margin:2px 0}
+.bars{display:flex;align-items:flex-end;gap:6px;height:140px;border-bottom:1px solid var(--bd);padding:0 2px;overflow-x:auto}
+.bar{flex:1;min-width:30px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer;font-size:11px;color:var(--tx2)}
+.bar i{display:block;width:100%;background:var(--bd);border-radius:5px 5px 0 0;margin-top:3px}
+.bar.on i{background:var(--ac)}
+.barlbl{display:flex;gap:6px;padding:4px 2px 0;font-size:11px;color:var(--tx2)}
+.barlbl span{flex:1;min-width:30px;text-align:center}
+.crow{padding:7px 0;font-size:14px}
+.crow .t{display:flex;justify-content:space-between;gap:8px}
+.crow .tr{height:6px;background:var(--bg);border-radius:3px;margin-top:4px}
+.crow .tr i{display:block;height:6px;background:var(--ac);border-radius:3px}
+.up{color:var(--err);font-size:12px}.down{color:var(--ok);font-size:12px}
 .hide{display:none!important}
 .nologin #tabs,.nologin section,.nologin #boot,.nologin #calBanner{display:none!important}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9;padding:16px}
@@ -82,6 +96,7 @@ input[type=text],input[type=number],input[type=date],input[type=month],select{wi
   <nav class="tabs" id="tabs">
     <button data-v="cargar" class="on">Cargar</button>
     <button data-v="mes">Mi mes</button>
+    <button data-v="stats">Estadísticas</button>
     <button data-v="cerrar">Cerrar mes</button>
   </nav>
 
@@ -119,6 +134,20 @@ input[type=text],input[type=number],input[type=date],input[type=month],select{wi
     <div class="card">
       <div class="total"><span class="small" id="totLbl">Total a rendir</span><b id="totVal">$ 0,00</b></div>
       <div id="grupos"></div>
+    </div>
+  </section>
+
+  <!-- ESTADISTICAS -->
+  <section id="v-stats" class="hide">
+    <div class="card">
+      <div class="kpis">
+        <div class="kpi"><span class="small" id="kMesLbl">Este mes</span><b id="kMes">$ 0</b><span class="small" id="kVar"></span></div>
+        <div class="kpi"><span class="small">Promedio mensual</span><b id="kProm">$ 0</b><span class="small" id="kProm2"></span></div>
+      </div>
+      <span class="lbl">Total por mes <span style="color:var(--tx3)">· tocá una barra para ver ese mes</span></span>
+      <div class="bars" id="bars"></div>
+      <span class="lbl" id="porConcLbl">Por concepto</span>
+      <div id="porConc"></div>
     </div>
   </section>
 
@@ -182,7 +211,7 @@ $('tabs').addEventListener('click', function (e) {
 function setView(v) {
   S.view = v;
   [].forEach.call($('tabs').children, function (b) { b.classList.toggle('on', b.dataset.v === v); });
-  ['cargar', 'mes', 'cerrar'].forEach(function (x) { $('v-' + x).classList.toggle('hide', x !== v); });
+  ['cargar', 'mes', 'stats', 'cerrar'].forEach(function (x) { $('v-' + x).classList.toggle('hide', x !== v); });
   render();
 }
 
@@ -480,10 +509,59 @@ $('fileImport').addEventListener('change', async function () {
   } catch (e) { note($('bkNote'), 'err', 'No se pudo importar ese archivo.'); }
 });
 
+
+/* ---------- estadísticas ---------- */
+function totalesPorMes() {
+  var m = {};
+  S.tickets.forEach(function (t) { if (!t.mes) return; m[t.mes] = m[t.mes] || { total: 0, n: 0, grupos: {} }; var v = Number(t.importe) || 0; m[t.mes].total += v; m[t.mes].n++; m[t.mes].grupos[t.grupo || 'OTROS'] = (m[t.mes].grupos[t.grupo || 'OTROS'] || 0) + v; });
+  return m;
+}
+function mesAnterior(m) { var p = m.split('-').map(Number); p[1]--; if (!p[1]) { p[1] = 12; p[0]--; } return p[0] + '-' + String(p[1]).padStart(2, '0'); }
+function nombreMes(m, corto) { var p = m.split('-'); var n = B.MESES_LARGO[Number(p[1]) - 1]; return corto ? n.slice(0, 3).toLowerCase() : n + ' ' + p[0]; }
+function kfmt(n) { return n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + 'M' : Math.round(n / 1000) + 'k'; }
+function pct(a, b) { if (!b) return null; return Math.round((a - b) / b * 100); }
+function renderStats() {
+  var tm = totalesPorMes(), mes = mesActual(), prev = mesAnterior(mes);
+  var meses = Object.keys(tm).sort();
+  var cur = tm[mes] || { total: 0, n: 0, grupos: {} }, ant = tm[prev];
+  $('kMesLbl').textContent = nombreMes(mes);
+  $('kMes').textContent = B.money(cur.total).replace(/,\d\d$/, '');
+  var v = ant ? pct(cur.total, ant.total) : null;
+  $('kVar').innerHTML = v === null ? (cur.n ? cur.n + (cur.n === 1 ? ' ticket' : ' tickets') : 'Sin tickets') : '<span class="' + (v > 0 ? 'up' : 'down') + '">' + (v > 0 ? '+' : '') + v + '%</span> vs ' + nombreMes(prev, true) + ' · ' + cur.n + ' tickets';
+  var conDatos = meses.filter(function (m) { return tm[m].total > 0; });
+  var prom = conDatos.length ? conDatos.reduce(function (s, m) { return s + tm[m].total; }, 0) / conDatos.length : 0;
+  var nt = conDatos.reduce(function (s, m) { return s + tm[m].n; }, 0);
+  $('kProm').textContent = B.money(prom).replace(/,\d\d$/, '');
+  $('kProm2').textContent = conDatos.length + (conDatos.length === 1 ? ' mes' : ' meses') + ' · ' + nt + ' tickets';
+  // barras: últimos 12 meses hasta el mes elegido (o el último con datos)
+  var fin = [mes, conDatos[conDatos.length - 1] || mes].sort()[1], lista = [], m = fin;
+  for (var i = 0; i < 12; i++) { lista.unshift(m); m = mesAnterior(m); }
+  var primero = conDatos[0] || mes; lista = lista.filter(function (x) { return x >= primero || x === mes; });
+  if (lista.length < 4) { while (lista.length < 4) { var p = lista[lista.length - 1].split('-').map(Number); p[1]++; if (p[1] > 12) { p[1] = 1; p[0]++; } lista.push(p[0] + '-' + String(p[1]).padStart(2, '0')); } }
+  var max = Math.max.apply(null, lista.map(function (x) { return tm[x] ? tm[x].total : 0; }).concat([1]));
+  $('bars').innerHTML = lista.map(function (x) { var t = tm[x] ? tm[x].total : 0; return '<div class="bar' + (x === mes ? ' on' : '') + '" data-m="' + x + '">' + (t ? kfmt(t) : '') + '<i style="height:' + Math.max(t ? 4 : 0, Math.round(t / max * 110)) + 'px"></i></div>'; }).join('') +
+    '';
+  $('bars').insertAdjacentHTML('afterend', '');
+  var lbl = $('barLbl'); if (!lbl) { lbl = document.createElement('div'); lbl.id = 'barLbl'; lbl.className = 'barlbl'; $('bars').after(lbl); }
+  lbl.innerHTML = lista.map(function (x) { return '<span>' + nombreMes(x, true) + '</span>'; }).join('');
+  [].forEach.call($('bars').children, function (b) { b.onclick = function () { $('mes').value = b.dataset.m; guardarCfg(); render(); }; });
+  // por concepto
+  $('porConcLbl').textContent = 'Por concepto · ' + nombreMes(mes) + (ant ? ' vs ' + nombreMes(prev, true) : '');
+  var gs = B.GRUPOS.filter(function (g) { return cur.grupos[g.id] || (ant && ant.grupos[g.id]); })
+    .sort(function (a, b) { return (cur.grupos[b.id] || 0) - (cur.grupos[a.id] || 0); });
+  var gmax = Math.max.apply(null, gs.map(function (g) { return cur.grupos[g.id] || 0; }).concat([1]));
+  $('porConc').innerHTML = gs.length ? gs.map(function (g) {
+    var a = cur.grupos[g.id] || 0, b = ant ? ant.grupos[g.id] || 0 : 0, d = ant ? pct(a, b) : null;
+    var dv = !ant ? '' : !b ? '<span class="up">nuevo</span>' : !a ? '<span class="down">−100%</span>' : '<span class="' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '+' : '') + d + '%</span>';
+    return '<div class="crow"><div class="t"><span>' + esc(g.label) + '</span><span>' + B.money(a).replace(/,\d\d$/, '') + ' ' + dv + '</span></div><div class="tr"><i style="width:' + Math.round(a / gmax * 100) + '%"></i></div></div>';
+  }).join('') : '<div class="empty">No hay tickets en este mes.</div>';
+}
+
 /* ---------- render ---------- */
 function render() {
   if (S.view === 'mes') renderMes();
   if (S.view === 'cerrar') renderCerrar();
+  if (S.view === 'stats') renderStats();
 }
 
 /* ---------- init ---------- */
