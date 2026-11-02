@@ -56,7 +56,7 @@
       get: async function () { return { docs: [], size: 0, empty: true }; }, // 'importar' no existe acá
       onSnapshot: function (next, err) {
         if (!ref) { setTimeout(function () { next({ docs: [], metadata: { fromCache: false } }); }, 0); return function () {}; }
-        return FB.onSnapshot(ref, { includeMetadataChanges: false }, function (qs) {
+        return FB.onSnapshot(ref, { includeMetadataChanges: true }, function (qs) {
           next({ docs: qs.docs.map(snapDoc), size: qs.size, empty: qs.empty, metadata: { fromCache: qs.metadata.fromCache } });
         }, function (e) { if (err) err({ code: 'unavailable', message: String(e) }); });
       }
