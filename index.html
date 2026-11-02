@@ -424,7 +424,8 @@ $('dlXlsx').onclick = function () {
     if (!window.PLANTILLA_B64) throw new Error('no se cargó la plantilla');
     var bin = atob(window.PLANTILLA_B64), tpl = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) tpl[i] = bin.charCodeAt(i);
-    var buf = await B.buildXlsx(ExcelJS, tpl.buffer, datosExport());
+    var dx = datosExport(); dx.mes = mesActual();
+    var buf = await B.buildXlsx(ExcelJS, tpl.buffer, dx);
     return new Blob([buf]);
   });
 };

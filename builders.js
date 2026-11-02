@@ -54,7 +54,14 @@
       cols.forEach(function (c) { ws.getCell(c + r).value = null; });
       if (!gr) continue;
       total += gr.total;
-      if (gr.ultimaFecha) ws.getCell('A' + r).value = isoToDate(gr.ultimaFecha);
+      // Un solo ticket: su fecha. Varios tickets juntos: solo el mes (ej. oct/2026)
+      if (gr.tickets.length === 1 && gr.ultimaFecha) {
+        ws.getCell('A' + r).value = isoToDate(gr.ultimaFecha);
+        ws.getCell('A' + r).numFmt = 'dd/mmm/yyyy';
+      } else {
+        var mesRef = data.mes || (gr.ultimaFecha ? gr.ultimaFecha.slice(0, 7) : null);
+        if (mesRef) { ws.getCell('A' + r).value = isoToDate(mesRef + '-01'); ws.getCell('A' + r).numFmt = 'mmm/yyyy'; }
+      }
       ws.getCell('B' + r).value = gr.grupo.concepto;
       ws.getCell('E' + r).value = 'ARS - Argentina';
       ws.getCell('F' + r).value = gr.total;
