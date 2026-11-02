@@ -13,6 +13,8 @@
   var MODELO = 'gemini-3.5-flash';
 
   var app = FB.initializeApp(CONFIG);
+  // App Check (reCAPTCHA Enterprise): Firebase AI Logic exige que los pedidos vengan de esta página
+  try { FB.initializeAppCheck(app, { provider: new FB.ReCaptchaEnterpriseProvider('6LcVZgsuAAAAAJOgXPu7WPW3ZBndWIDUEvFU8dOl'), isTokenAutoRefreshEnabled: true }); } catch (e) {}
   var auth = FB.getAuth(app);
   var fs;
   try { fs = FB.initializeFirestore(app, { localCache: FB.persistentLocalCache() }); }
