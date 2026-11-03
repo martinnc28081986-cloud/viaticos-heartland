@@ -287,7 +287,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
       <input type="file" id="fotoGal" accept="image/*" class="hide">
       <div class="picker" id="picker"><button type="button" id="btnCam"><span class="ms">photo_camera</span>Cámara</button><button type="button" id="btnGal"><span class="ms">image</span>Galería</button></div>
       <img id="preview" class="prev hide" alt="Ticket">
-      <button type="button" class="lnk hide" id="otraFoto" style="margin-top:8px">Cambiar foto</button>
+      <div style="display:flex;gap:16px;margin-top:8px"><button type="button" class="lnk hide" id="otraFoto">Cambiar foto</button><button type="button" class="lnk hide" id="btnLeer">Leer ticket</button></div>
       <div id="readNote" class="note hide"></div>
       <div class="sect"><span>Datos del gasto</span></div>
       <div class="ficha">
@@ -318,9 +318,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=19"></script>
-<script src="shim.js?v=19"></script>
-<script src="builders.js?v=19"></script>
+<script src="fb.bundle.js?v=20"></script>
+<script src="shim.js?v=20"></script>
+<script src="builders.js?v=20"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -468,15 +468,20 @@ async function prepararImagen(file) {
   var blob = await new Promise(function (r) { cv.toBlob(r, 'image/jpeg', 0.82); });
   return { blob: blob, w: cv.width, h: cv.height };
 }
-function mostrarFoto(src) { $('preview').src = src; $('preview').classList.remove('hide'); $('picker').classList.add('hide'); $('otraFoto').classList.remove('hide'); }
+function mostrarFoto(src) { $('preview').src = src; $('preview').classList.remove('hide'); $('picker').classList.add('hide'); $('otraFoto').classList.remove('hide'); $('btnLeer').classList.toggle('hide', !S.sample); }
 async function onFoto() {
-  var f = this.files && this.files[0]; this.value = ''; if (!f) return;
+  var inp = this, f = inp.files && inp.files[0]; if (!f) return;
+  try { sessionStorage.removeItem('camara'); } catch (e) {}
+  note($('readNote'), 'info', '<span class="spin"></span>Preparando la foto…');
+  try { f = new Blob([await f.arrayBuffer()], { type: f.type || 'image/jpeg' }); } catch (e) {}
+  inp.value = '';
   try { var p = await prepararImagen(f); S.blob = p.blob; S.dims = { w: p.w, h: p.h }; mostrarFoto(URL.createObjectURL(p.blob)); leerTicket(); }
   catch (e) { note($('readNote'), 'err', 'No pude abrir esa imagen. Probá con otra foto.'); }
 }
 $('foto').addEventListener('change', onFoto); $('fotoGal').addEventListener('change', onFoto);
-$('btnCam').onclick = function () { $('foto').click(); }; $('btnGal').onclick = function () { $('fotoGal').click(); };
-$('otraFoto').onclick = function () { $('preview').classList.add('hide'); $('picker').classList.remove('hide'); this.classList.add('hide'); };
+$('btnCam').onclick = function () { try { sessionStorage.setItem('camara', Date.now()); } catch (e) {} $('foto').click(); };
+$('btnLeer').onclick = function () { leerTicket(); }; $('btnGal').onclick = function () { $('fotoGal').click(); };
+$('otraFoto').onclick = function () { $('preview').classList.add('hide'); $('picker').classList.remove('hide'); this.classList.add('hide'); $('btnLeer').classList.add('hide'); };
 $('preview').onclick = function () { $('ovImg').src = this.src; $('overlay').classList.remove('hide'); };
 $('overlay').onclick = function () { this.classList.add('hide'); };
 
@@ -493,7 +498,15 @@ async function leerTicket() {
     'Respondé SOLO con un objeto JSON: {"fecha":"YYYY-MM-DD" o null,"proveedor":"nombre corto" o null,"importe":número o null,"litros":número o null (solo si es combustible: litros cargados),"moneda":uno de [' + monedas + '],"grupo":uno de [' + grupos + '] o null}. ' +
     'Ejemplo: {"fecha":"2026-10-14","proveedor":"YPF","importe":98450,"moneda":"ARS","grupo":"COMBUSTIBLE"}';
   try {
-    var r = await S.sample.json(prompt, { images: [S.blob], signal: ctl.signal });
+    var r;
+    try { r = await S.sample.json(prompt, { images: [S.blob], signal: ctl.signal }); }
+    catch (e1) {
+      if (!e1 || !/upstream_error|invalid_json|rate_limited/.test(e1.code) || ctl.signal.aborted) throw e1;
+      note($('readNote'), 'info', '<span class="spin"></span>Leyendo el ticket… (segundo intento)');
+      await new Promise(function (ok) { setTimeout(ok, e1.code === 'rate_limited' ? 6000 : 1500); });
+      if (ctl.signal.aborted) return;
+      r = await S.sample.json(prompt, { images: [S.blob], signal: ctl.signal });
+    }
     if (ctl.signal.aborted) return;
     var libre = function (id) { return !$(id).dataset.touched; }, leidos = [];
     if (r && r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) { leidos.push('fecha'); if (libre('fFecha')) $('fFecha').value = r.fecha; }
@@ -519,7 +532,7 @@ async function leerTicket() {
 function resetForm() {
   S.blob = null; S.dims = null; S.editId = null; S.grupo = null;
   if (S.readCtl) S.readCtl.abort();
-  $('preview').classList.add('hide'); $('preview').removeAttribute('src'); $('picker').classList.remove('hide'); $('otraFoto').classList.add('hide');
+  $('preview').classList.add('hide'); $('preview').removeAttribute('src'); $('picker').classList.remove('hide'); $('otraFoto').classList.add('hide'); $('btnLeer').classList.add('hide');
   S.dupOk = false;
   ['fFecha', 'fImporte', 'fProv', 'fTc', 'fKm', 'fLitros'].forEach(function (id) { $(id).value = ''; delete $(id).dataset.touched; });
   $('fMoneda').value = 'ARS'; delete $('fMoneda').dataset.touched;
@@ -1062,6 +1075,13 @@ function render() {
   if (S.view === 'enviar') renderEnviar();
   if (S.view === 'nuevo') $('nRend').textContent = 'Rendición ' + etiquetaRend(rendSel());
 }
+(function avisoCamara() {
+  var t = 0; try { t = Number(sessionStorage.getItem('camara')) || 0; sessionStorage.removeItem('camara'); } catch (e) {}
+  if (t && Date.now() - t < 5 * 60 * 1000) setTimeout(function () {
+    note($('fatal'), 'warn', 'El celular cerró la app mientras usabas la cámara (pasa cuando le falta memoria) y la foto se perdió. Probá de nuevo; si se repite, cerrá otras apps o sacá la foto con la cámara y elegila con "Galería".');
+    setTimeout(function () { $('fatal').classList.add('hide'); }, 15000);
+  }, 800);
+})();
 (function initStatic() {
   $('cMotivo').value = 'REPRESENTACIÓN COMERCIAL';
   renderChips(); actualizarMoneda(); renderInicio();
