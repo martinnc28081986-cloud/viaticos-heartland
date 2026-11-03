@@ -112,6 +112,10 @@ input:focus,select:focus{outline:2px solid var(--ac);outline-offset:-1px;border-
 .crow .tr{height:6px;background:var(--bg);border-radius:3px;margin-top:5px}
 .crow .tr i{display:block;height:6px;background:var(--ac);border-radius:3px}
 .up{color:var(--err);font-size:12px}.down{color:var(--ok);font-size:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.g2 b{display:block;font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.mini{display:flex;align-items:flex-end;gap:6px;height:54px;margin-top:12px}.mini i{flex:1;background:#B5D4F4;border-radius:4px 4px 0 0;min-height:2px}.mini i.on{background:var(--ac)}.minil{display:flex;gap:6px;font-size:11px;color:var(--tx2);text-align:center}.minil span{flex:1}
+.prog{height:6px;background:var(--bg);border-radius:3px;margin-top:8px}.prog i{display:block;height:6px;background:var(--ac);border-radius:3px}
+.reint{border:1px solid #B5D4F4;background:#EEF5FC}
 .file{display:flex;gap:12px;align-items:center;border:1px solid var(--bd);border-radius:12px;padding:12px;margin-top:10px}
 .file .ms{font-size:28px}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px}
@@ -188,6 +192,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
   <section id="v-analisis" class="view">
     <header class="hero sm"><div class="toprow"><h1><span class="ms">bar_chart</span>Análisis</h1></div><small>Por mes calendario, según la fecha de cada gasto · en pesos</small></header>
     <div class="wrap" style="margin-top:14px">
+      <div id="aReint"></div>
       <div class="kpis">
         <div class="kpi"><span class="sub" id="kMesLbl">Este mes</span><b id="kMes">$ 0</b><span class="sub" id="kVar"></span></div>
         <div class="kpi"><span class="sub">Promedio mensual</span><b id="kProm">$ 0</b><span class="sub" id="kProm2"></span></div>
@@ -196,7 +201,14 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
         <div class="sub" style="margin-bottom:8px">Total por mes · tocá una barra</div>
         <div class="bars" id="bars"></div><div class="barlbl" id="barLbl"></div>
       </div>
+      <div class="card" id="aRitmo"></div>
+      <div class="card" id="aKm"></div>
       <div class="card"><div class="sub" id="porConcLbl">Por concepto</div><div id="porConc"></div></div>
+      <div class="card" id="aCom"></div>
+      <div id="aRev"></div>
+      <div class="card"><details id="topesBox"><summary>Topes diarios por concepto (opcional)</summary>
+        <p class="sub" style="margin:8px 0">Si un día te pasás, la app te avisa en Análisis y al cerrar la rendición. Dejá vacío para no controlar.</p>
+        <div id="topesForm"></div></details></div>
     </div>
   </section>
 
@@ -284,6 +296,8 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
         <div class="frow hide" id="rowArs"><label>En pesos</label><span style="flex:1"></span><b id="fArs" class="amt">$ 0,00</b></div>
         <div class="frow"><label for="fFecha">Fecha</label><input type="date" id="fFecha"></div>
         <div class="frow"><label for="fProv">Proveedor</label><input type="text" id="fProv" placeholder="YPF Ruta 2"></div>
+        <div class="frow hide" id="rowKm"><label for="fKm">Km del auto</label><input type="text" inputmode="numeric" id="fKm" placeholder="Lo que marca el tablero"></div>
+        <div class="frow hide" id="rowLt"><label for="fLitros">Litros</label><input type="text" inputmode="decimal" id="fLitros" placeholder="0,00"></div>
       </div>
       <div class="sect"><span>Concepto</span></div>
       <div class="chips" id="chips"></div>
@@ -304,9 +318,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=16"></script>
-<script src="shim.js?v=16"></script>
-<script src="builders.js?v=16"></script>
+<script src="fb.bundle.js?v=19"></script>
+<script src="shim.js?v=19"></script>
+<script src="builders.js?v=19"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -411,6 +425,8 @@ function abrirNuevo(desde) { resetForm(); setView('nuevo', desde); }
 
 /* ---------- formulario de gasto ---------- */
 function renderChips() {
+  var nafta = S.grupo === 'COMBUSTIBLE'; $('rowKm').classList.toggle('hide', !nafta); $('rowLt').classList.toggle('hide', !nafta);
+  if (nafta) { var uk = ultimoKm(); $('fKm').placeholder = uk ? 'Última carga: ' + B.fmtNum(uk, 0) + ' km' : 'Lo que marca el tablero'; }
   $('chips').innerHTML = '';
   B.PRINCIPALES.forEach(function (g) {
     var c = document.createElement('button'); c.type = 'button'; c.className = 'chip' + (S.grupo === g.id ? ' on' : '');
@@ -474,13 +490,14 @@ async function leerTicket() {
   var prompt = 'La imagen es un ticket, factura o comprobante de pago (o captura de un pago, p. ej. TelePASE/peaje, estacionamiento, combustible, comida, hotel, taxi). ' +
     'Puede ser de Argentina o de otro país. Extraé los datos. En Argentina los importes usan punto para miles y coma para decimales ("98.450,00" = 98450.00). ' +
     'El importe es el TOTAL pagado (si hay varios movimientos, la suma). La moneda es la del comprobante: ARS si es de Argentina en pesos; si no, la que corresponda. ' +
-    'Respondé SOLO con un objeto JSON: {"fecha":"YYYY-MM-DD" o null,"proveedor":"nombre corto" o null,"importe":número o null,"moneda":uno de [' + monedas + '],"grupo":uno de [' + grupos + '] o null}. ' +
+    'Respondé SOLO con un objeto JSON: {"fecha":"YYYY-MM-DD" o null,"proveedor":"nombre corto" o null,"importe":número o null,"litros":número o null (solo si es combustible: litros cargados),"moneda":uno de [' + monedas + '],"grupo":uno de [' + grupos + '] o null}. ' +
     'Ejemplo: {"fecha":"2026-10-14","proveedor":"YPF","importe":98450,"moneda":"ARS","grupo":"COMBUSTIBLE"}';
   try {
     var r = await S.sample.json(prompt, { images: [S.blob], signal: ctl.signal });
     if (ctl.signal.aborted) return;
     var libre = function (id) { return !$(id).dataset.touched; }, leidos = [];
     if (r && r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) { leidos.push('fecha'); if (libre('fFecha')) $('fFecha').value = r.fecha; }
+    if (r && r.litros != null && Number(r.litros) > 0) { leidos.push('litros'); if (libre('fLitros')) $('fLitros').value = B.fmtNum(r.litros); }
     if (r && r.proveedor) { leidos.push('proveedor'); if (libre('fProv')) $('fProv').value = String(r.proveedor).slice(0, 80); }
     if (r && r.importe != null && !isNaN(Number(r.importe))) { leidos.push('importe'); if (libre('fImporte')) $('fImporte').value = B.fmtNum(r.importe); }
     if (r && r.moneda && B.MONEDAS.some(function (m) { return m.code === r.moneda; }) && libre('fMoneda')) { $('fMoneda').value = r.moneda; if (r.moneda !== 'ARS') leidos.push('moneda ' + r.moneda); }
@@ -498,12 +515,13 @@ async function leerTicket() {
     if (e && (e.code === 'not_granted' || e.code === 'images_unavailable' || e.code === 'sampling_disabled')) S.sample = null;
   }
 }
-['fFecha', 'fImporte', 'fProv', 'fTc'].forEach(function (id) { $(id).addEventListener('input', function () { this.dataset.touched = '1'; }); });
+['fFecha', 'fImporte', 'fProv', 'fTc', 'fKm', 'fLitros'].forEach(function (id) { $(id).addEventListener('input', function () { this.dataset.touched = '1'; }); });
 function resetForm() {
   S.blob = null; S.dims = null; S.editId = null; S.grupo = null;
   if (S.readCtl) S.readCtl.abort();
   $('preview').classList.add('hide'); $('preview').removeAttribute('src'); $('picker').classList.remove('hide'); $('otraFoto').classList.add('hide');
-  ['fFecha', 'fImporte', 'fProv', 'fTc'].forEach(function (id) { $(id).value = ''; delete $(id).dataset.touched; });
+  S.dupOk = false;
+  ['fFecha', 'fImporte', 'fProv', 'fTc', 'fKm', 'fLitros'].forEach(function (id) { $(id).value = ''; delete $(id).dataset.touched; });
   $('fMoneda').value = 'ARS'; delete $('fMoneda').dataset.touched;
   ['readNote', 'formErr', 'borrar'].forEach(function (id) { $(id).classList.add('hide'); });
   $('nTitulo').textContent = 'Nuevo gasto'; $('guardar').textContent = 'Guardar gasto'; $('lastSaved').textContent = '';
@@ -511,9 +529,9 @@ function resetForm() {
 }
 function editar(t) {
   resetForm(); S.editId = t.id; S.grupo = t.grupo;
-  $('fFecha').value = t.fecha || ''; $('fImporte').value = B.fmtNum(t.importe); $('fProv').value = t.proveedor || '';
+  $('fFecha').value = t.fecha || ''; $('fImporte').value = B.fmtNum(t.importe); $('fProv').value = t.proveedor || ''; $('fKm').value = t.km ? B.fmtNum(t.km, 0) : ''; $('fLitros').value = t.litros ? B.fmtNum(t.litros) : '';
   $('fMoneda').value = t.moneda || 'ARS'; $('fTc').value = t.moneda && t.moneda !== 'ARS' && t.tc ? B.fmtNum(t.tc) : '';
-  ['fFecha', 'fImporte', 'fProv', 'fTc', 'fMoneda'].forEach(function (id) { $(id).dataset.touched = '1'; });
+  ['fFecha', 'fImporte', 'fProv', 'fTc', 'fMoneda', 'fKm', 'fLitros'].forEach(function (id) { $(id).dataset.touched = '1'; });
   if (t.assetId) fotoDe(t).then(function (u) { if (u) mostrarFoto(u); });
   $('nTitulo').textContent = 'Editar gasto'; $('guardar').textContent = 'Guardar cambios'; $('borrar').classList.remove('hide');
   actualizarMoneda(); renderChips(); setView('nuevo', S.view === 'nuevo' ? S.back : S.view);
@@ -523,10 +541,14 @@ $('guardar').addEventListener('click', async function () {
   var err = !S.editId && !rendSel() ? 'Primero creá una rendición (pestaña Rendiciones → Nueva).' : !S.blob && !S.editId ? 'Sacá o subí la foto del ticket.' : !fecha ? 'Falta la fecha.' :
     !(imp > 0) ? 'Falta el importe (ej: 98450,00).' : !(tc > 0) ? 'Falta el tipo de cambio: cuántos pesos vale 1 ' + mon + '.' : !S.grupo ? 'Elegí el concepto.' : '';
   if (err) { note($('formErr'), 'err', err); return; }
+  if (!S.editId && !S.dupOk) {
+    var dp = buscarDuplicado({ fecha: fecha, importe: imp, moneda: mon, grupo: S.grupo });
+    if (dp) { S.dupOk = true; note($('formErr'), 'warn', 'Parece repetido: ya cargaste ' + esc(dp.proveedor || B.grupoDe(dp.grupo).label) + ' ' + B.money(dp.importe, dp.moneda) + ' el ' + B.fechaAR(dp.fecha) + '. Si es otro gasto, tocá Guardar de nuevo.'); return; }
+  }
   if (!S.tkCol) { note($('formErr'), 'err', 'No hay conexión con tu almacenamiento. Recargá la página.'); return; }
   var btn = this; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Guardando…';
   try {
-    var data = { fecha: fecha, importe: B.round2(imp), moneda: mon, tc: mon === 'ARS' ? 1 : tc, proveedor: $('fProv').value.trim(), grupo: S.grupo, mes: fecha.slice(0, 7) };
+    var data = { fecha: fecha, importe: B.round2(imp), moneda: mon, tc: mon === 'ARS' ? 1 : tc, proveedor: $('fProv').value.trim(), km: S.grupo === 'COMBUSTIBLE' ? (parseInt($('fKm').value.replace(/\D/g, ''), 10) || null) : null, litros: S.grupo === 'COMBUSTIBLE' ? (parseNum($('fLitros').value) || null) : null, grupo: S.grupo, mes: fecha.slice(0, 7) };
     if (mon !== 'ARS') { var tcs = Object.assign({}, S.cfg.tcs || {}); tcs[mon] = tc; S.cfg = Object.assign({}, S.cfg, { tcs: tcs }); guardarCfgYa(); }
     if (S.editId) {
       var old = S.tickets.filter(function (t) { return t.id === S.editId; })[0] || {};
@@ -569,6 +591,7 @@ function itemGasto(t) {
 function alertaTicket(t) {
   var r = rendSel();
   if (r && t.fecha && (t.fecha < r.desde || t.fecha > r.hasta)) return ' · <span style="color:var(--warn)">fuera del período</span>';
+  if (buscarDuplicado(t, t.id)) return ' · <span style="color:var(--warn)">posible repetido</span>';
   return '';
 }
 function renderInicio() {
@@ -683,6 +706,7 @@ function renderEnviar() {
   var vistos = {}, dup = [];
   ts.forEach(function (t) { var k = t.fecha + '|' + B.round2(t.importe) + '|' + (t.moneda || 'ARS'); if (vistos[k]) dup.push(t); vistos[k] = 1; });
   if (dup.length) al.push(['warn', 'Posible gasto repetido: ' + dup.map(function (t) { return B.fechaAR(t.fecha) + ' ' + B.money(t.importe, t.moneda); }).join(', ') + '.']);
+  excesosTope(ts).forEach(function (x) { al.push(['warn', 'Tope diario superado: ' + x.label + ' ' + B.fechaAR(x.fecha) + ' ' + B.money(x.total) + ' (tope ' + B.money(x.tope) + ').']); });
   var sinTc = ts.filter(function (t) { return t.moneda && t.moneda !== 'ARS' && !(Number(t.tc) > 0); });
   if (sinTc.length) al.push(['warn', plural(sinTc.length, 'gasto en moneda extranjera no tiene', 'gastos en moneda extranjera no tienen') + ' tipo de cambio.']);
   if (ts.length && !al.length) al.push(['ok', '✓ ' + plural(ts.length, 'gasto', 'gastos') + ' sin alertas.']);
@@ -696,7 +720,7 @@ var cfgTimer = null;
 function guardarCfgYa() {
   clearTimeout(cfgTimer);
   if (!S.cfgRef) return;
-  var c = { colaborador: $('cColab').value.trim(), motivoBase: $('cMotivo').value.trim(), ceco: $('cCeco').value, mail: $('cMail').value.trim(), rendiciones: rends(), sel: S.sel || null, tcs: S.cfg.tcs || {} };
+  var c = { colaborador: $('cColab').value.trim(), motivoBase: $('cMotivo').value.trim(), ceco: $('cCeco').value, mail: $('cMail').value.trim(), rendiciones: rends(), sel: S.sel || null, tcs: S.cfg.tcs || {}, topes: S.cfg.topes || {} };
   if (JSON.stringify(c) === S.cfgGuardada) return;
   S.cfg = c; S.cfgGuardada = JSON.stringify(c); S.cfgRef.set(c).catch(function () {});
 }
@@ -865,6 +889,7 @@ function renderStats() {
   $('bars').innerHTML = lista.map(function (x) { var t = tm[x] ? tm[x].total : 0; return '<div class="bar' + (x === mes ? ' on' : '') + '" data-m="' + x + '">' + (t ? kfmt(t) : '') + '<i style="height:' + Math.max(t ? 4 : 0, Math.round(t / max * 110)) + 'px"></i></div>'; }).join('');
   $('barLbl').innerHTML = lista.map(function (x) { return '<span>' + nombreMes(x, true) + '</span>'; }).join('');
   [].forEach.call($('bars').children, function (b) { b.onclick = function () { S.statMes = b.dataset.m; renderStats(); }; });
+  renderExtras(mes, prev, tm);
   $('porConcLbl').textContent = 'Por concepto · ' + nombreMes(mes) + (ant ? ' vs ' + nombreMes(prev, true) : '');
   var gs = B.GRUPOS.filter(function (g) { return cur.grupos[g.id] || (ant && ant.grupos[g.id]); }).sort(function (a, b) { return (cur.grupos[b.id] || 0) - (cur.grupos[a.id] || 0); });
   var gmax = Math.max.apply(null, gs.map(function (g) { return cur.grupos[g.id] || 0; }).concat([1]));
@@ -875,6 +900,112 @@ function renderStats() {
   }).join('') : '<div class="empty">No hay gastos en este mes.</div>';
 }
 
+
+
+/* ---------- estadísticas extra: km, reintegro, ritmo, gira, comercios, controles ---------- */
+var GR_COMIDA = ['COMIDAS', '53350 - COMIDAS Y ENTRETENIMIENTO', '63350 - COMIDAS Y ENTRETENIMIENTO'];
+var GR_PEAJE = ['PEAJES', 'ESTACIONAMIENTO', '53320 - PEAJES Y ESTACIONAMIENTO', '63320 - PEAJES Y ESTACIONAMIENTO'];
+var GR_NAFTA = ['COMBUSTIBLE', '53330 - GASOLINA', '63330 - GASOLINA'];
+var TOPES_DEF = [['COMIDAS', 'Comidas'], ['HOSPEDAJE', 'Hospedaje'], ['TAXIS Y PASAJES', 'Taxis y pasajes'], ['COMBUSTIBLE', 'Combustible']];
+function diasEntre(a, b) { return Math.abs((new Date(a + 'T00:00:00') - new Date(b + 'T00:00:00')) / 864e5); }
+function buscarDuplicado(t, exceptoId) {
+  if (!t.fecha) return null;
+  var imp = B.round2(t.importe), mon = t.moneda || 'ARS';
+  return S.tickets.filter(function (x) { return x.id !== exceptoId && x.fecha && (x.grupo || 'OTROS') === (t.grupo || 'OTROS') && (x.moneda || 'ARS') === mon && B.round2(x.importe) === imp && diasEntre(x.fecha, t.fecha) <= 1; })[0] || null;
+}
+function ultimoKm() { var k = S.tickets.map(function (t) { return Number(t.km) || 0; }); return k.length ? Math.max.apply(null, k) : 0; }
+function tramosKm() {
+  var f = S.tickets.filter(function (t) { return t.grupo === 'COMBUSTIBLE' && Number(t.km) > 0; }).sort(function (a, b) { return a.km - b.km || (a.fecha || '').localeCompare(b.fecha || ''); });
+  var out = [];
+  for (var i = 1; i < f.length; i++) { var d = f[i].km - f[i - 1].km; if (d > 0 && d < 3000) out.push({ mes: (f[i].fecha || '').slice(0, 7), km: d, litros: Number(f[i].litros) || 0 }); }
+  return out;
+}
+function kmDeMes(tr, m) {
+  var x = tr.filter(function (t) { return t.mes === m; }), km = 0, kmL = 0, lt = 0;
+  x.forEach(function (t) { km += t.km; if (t.litros) { kmL += t.km; lt += t.litros; } });
+  return { km: km, consumo: kmL ? lt / kmL * 100 : null };
+}
+function precioLitro(m) {
+  var x = S.tickets.filter(function (t) { return t.grupo === 'COMBUSTIBLE' && Number(t.litros) > 0 && (t.fecha || '').slice(0, 7) === m; });
+  var lt = x.reduce(function (s, t) { return s + Number(t.litros); }, 0);
+  return lt ? x.reduce(function (s, t) { return s + B.ars(t); }, 0) / lt : null;
+}
+function sumaGrupos(g, ids) { return ids.reduce(function (s, id) { return s + (g[id] || 0); }, 0); }
+function varPct(a, b) { if (a == null || !b) return ''; var v = pct(a, b); return ' <span class="' + (v > 0 ? 'up' : 'down') + '">' + (v > 0 ? '+' : '') + v + '% vs ' + '</span>'; }
+function pagoDe(r) { var base = r.rendidaEl || r.hasta, c = CICLOS.filter(function (x) { return x[0] >= base; })[0]; return c ? c[2] : null; }
+function excesosTope(ts) {
+  var topes = (S.cfg && S.cfg.topes) || {}, acc = {}, out = [];
+  ts.forEach(function (t) { var tope = Number(topes[t.grupo]); if (!tope || !t.fecha) return; var k = t.fecha + '|' + t.grupo; acc[k] = acc[k] || { fecha: t.fecha, label: B.grupoDe(t.grupo).label, tope: tope, total: 0 }; acc[k].total += B.ars(t); });
+  Object.keys(acc).sort().forEach(function (k) { if (acc[k].total > acc[k].tope) out.push(acc[k]); });
+  return out;
+}
+function renderExtras(mes, prev, tm) {
+  var hoy = hoyISO(), cur = tm[mes] || { total: 0, n: 0, grupos: {} }, ant = tm[prev] || null;
+  var tsMes = S.tickets.filter(function (t) { return ((t.fecha || '').slice(0, 7) || t.mes) === mes; });
+  // Reintegro pendiente
+  var pend = rends().filter(function (r) { return r.estado === 'rendida'; }).map(function (r) { return { r: r, pago: pagoDe(r), total: totalArs(ticketsDe(r)) }; })
+    .filter(function (x) { return x.pago && x.pago >= hoy && x.total > 0; }).sort(function (a, b) { return a.pago < b.pago ? -1 : 1; });
+  var ab = rends().filter(function (r) { return r.estado !== 'rendida'; }).map(function (r) { return { r: r, total: totalArs(ticketsDe(r)) }; }).filter(function (x) { return x.total > 0; });
+  var prox = CICLOS.filter(function (c) { return c[0] >= hoy; })[0];
+  var h = '';
+  if (pend.length) {
+    var tp = pend.reduce(function (s, x) { return s + x.total; }, 0);
+    h += '<div class="card reint"><div class="toprow"><div><div class="sub" style="color:#185FA5">Reintegro pendiente</div><b style="font-size:22px;color:#0C447C">' + sinCent(B.money(tp)) + '</b><div class="sub" style="color:#185FA5">' + pend.map(function (x) { return esc(etiquetaRend(x.r)); }).join(' + ') + ' · rendida</div></div>' +
+      '<div style="text-align:right"><div class="sub" style="color:#185FA5">Cobrás el</div><b style="color:#0C447C">' + fechaCorta(pend[0].pago) + '</b></div></div></div>';
+  }
+  if (ab.length && prox) h += '<div class="card"><div class="sub">En curso sin rendir</div><div class="toprow"><b style="font-size:18px">' + sinCent(B.money(ab.reduce(function (s, x) { return s + x.total; }, 0))) + '</b><span class="sub">cierre de carga ' + fechaCorta(prox[0]) + ' · cobro ' + fechaCorta(prox[2]) + '</span></div></div>';
+  $('aReint').innerHTML = h;
+  // Ritmo + días de gira
+  var dias = {}; tsMes.forEach(function (t) { if (t.fecha) dias[t.fecha] = 1; });
+  var nd = Object.keys(dias).length, r = '<div class="sub" style="margin-bottom:8px">' + (mes === hoyMes() ? 'Ritmo del mes' : 'Días de gira') + '</div>';
+  if (mes === hoyMes() && cur.total) {
+    var dia = Number(hoy.slice(8)), dm = Number(ultimoDia(mes).slice(8));
+    var antAl = S.tickets.filter(function (t) { return (t.fecha || '').slice(0, 7) === prev && Number(t.fecha.slice(8)) <= dia; }).reduce(function (s, t) { return s + B.ars(t); }, 0);
+    var proy = cur.total / dia * dm;
+    r += '<div class="toprow"><div><b style="font-size:19px">' + sinCent(B.money(cur.total)) + '</b><div class="sub">al día ' + dia + (antAl ? ' ·' + varPct(cur.total, antAl).replace(' vs ', ' vs ' + nombreMes(prev, true) + ' al mismo día') : '') + '</div></div>' +
+      (dia >= 5 ? '<div style="text-align:right"><div class="sub">Proyección de cierre</div><b>' + sinCent(B.money(proy)) + '</b></div>' : '') + '</div><div class="prog"><i style="width:' + Math.round(dia / dm * 100) + '%"></i></div>';
+  }
+  if (nd) {
+    var po = function (ids) { return sinCent(B.money(sumaGrupos(cur.grupos, ids) / nd)); };
+    r += '<div style="margin-top:10px"><b>' + plural(nd, 'día', 'días') + ' con gastos</b> · ' + sinCent(B.money(cur.total / nd)) + ' por día</div><div class="sub">Por día: comida ' + po(GR_COMIDA) + ' · peajes ' + po(GR_PEAJE) + ' · nafta ' + po(GR_NAFTA) + '</div>';
+  } else r += '<div class="empty">Sin gastos en este mes.</div>';
+  $('aRitmo').innerHTML = r;
+  // Auto y km
+  var tr = tramosKm(), k = kmDeMes(tr, mes), kp = kmDeMes(tr, prev), pl = precioLitro(mes), plp = precioLitro(prev);
+  var a = '<div class="sub" style="margin-bottom:8px">Auto y kilómetros · ' + nombreMes(mes, true) + '</div>';
+  if (!tr.length) a += '<div class="sub">Cuando cargues nafta, poné los <b>km del auto</b> que marca el tablero. Desde la segunda carga vas a ver km recorridos, consumo, costo por km y precio del litro.</div>';
+  else {
+    var gas = sumaGrupos(cur.grupos, GR_NAFTA) + sumaGrupos(cur.grupos, GR_PEAJE);
+    var nPrev = nombreMes(prev, true), vv = function (x, y) { return varPct(x, y).replace(' vs ', ' vs ' + nPrev); };
+    a += '<div class="g2"><div><b>' + (k.km ? B.fmtNum(k.km, 0) + ' km' : '—') + '</b><span class="sub">recorridos' + vv(k.km || null, kp.km) + '</span></div>' +
+      '<div><b>' + (k.consumo ? B.fmtNum(k.consumo, 1) + ' L' : '—') + '</b><span class="sub">cada 100 km' + vv(k.consumo, kp.consumo) + '</span></div>' +
+      '<div><b>' + (k.km ? sinCent(B.money(gas / k.km)) : '—') + '</b><span class="sub">por km (nafta + peajes)</span></div>' +
+      '<div><b>' + (pl ? sinCent(B.money(pl)) : '—') + '</b><span class="sub">el litro' + vv(pl, plp) + '</span></div></div>';
+    var ms = [], mm = mes; for (var i = 0; i < 6; i++) { ms.unshift(mm); mm = mesAnterior(mm); }
+    var kms = ms.map(function (x) { return kmDeMes(tr, x).km; }), mx = Math.max.apply(null, kms.concat([1]));
+    a += '<div class="mini">' + kms.map(function (v, i) { return '<i class="' + (ms[i] === mes ? 'on' : '') + '" style="height:' + Math.round(v / mx * 100) + '%" title="' + B.fmtNum(v, 0) + ' km"></i>'; }).join('') + '</div><div class="minil">' + ms.map(function (x) { return '<span>' + nombreMes(x, true) + '</span>'; }).join('') + '</div>';
+  }
+  $('aKm').innerHTML = a;
+  // Comercios
+  var cm = {}; tsMes.forEach(function (t) { var n = (t.proveedor || '').trim(); if (!n) return; var key = n.toLowerCase(); cm[key] = cm[key] || { n: n, c: 0, t: 0 }; cm[key].c++; cm[key].t += B.ars(t); });
+  var top = Object.keys(cm).map(function (x) { return cm[x]; }).sort(function (x, y) { return y.t - x.t; }).slice(0, 5);
+  $('aCom').innerHTML = '<div class="sub" style="margin-bottom:4px">Dónde más gastaste · ' + nombreMes(mes, true) + '</div>' + (top.length ? top.map(function (x) { return '<div class="crow"><div class="t"><span>' + esc(x.n) + ' <span class="sub">· ' + plural(x.c, 'vez', 'veces') + '</span></span><span>' + sinCent(B.money(x.t)) + '</span></div></div>'; }).join('') : '<div class="empty">Sin datos de proveedor.</div>');
+  // Revisar
+  var rev = [], vis = {};
+  tsMes.forEach(function (t) { var d = buscarDuplicado(t, t.id); if (d && !vis[d.id]) { vis[t.id] = 1; rev.push('Posible repetido: ' + esc(t.proveedor || B.grupoDe(t.grupo).label) + ' ' + B.money(t.importe, t.moneda) + ' (' + B.fechaAR(t.fecha).slice(0, 5) + ' y ' + B.fechaAR(d.fecha).slice(0, 5) + ')'); } });
+  excesosTope(tsMes).forEach(function (x) { rev.push('Tope superado: ' + esc(x.label) + ' el ' + B.fechaAR(x.fecha).slice(0, 5) + ' · ' + B.money(x.total) + ' (tope ' + B.money(x.tope) + ')'); });
+  $('aRev').innerHTML = rev.length ? '<div class="note warn" style="margin:0 0 12px"><b>Revisar</b><br>' + rev.join('<br>') + '</div>' : '';
+  // Topes (formulario)
+  if (!$('topesForm').dataset.ok) {
+    $('topesForm').dataset.ok = '1';
+    $('topesForm').innerHTML = TOPES_DEF.map(function (x) { return '<label class="field"><span>' + x[1] + ' por día ($)</span><input type="text" inputmode="numeric" data-tope="' + x[0] + '"></label>'; }).join('');
+    [].forEach.call($('topesForm').querySelectorAll('input'), function (inp) {
+      inp.addEventListener('change', function () { var tp = Object.assign({}, S.cfg.topes || {}), v = parseInt(this.value.replace(/\D/g, ''), 10); if (v) tp[this.dataset.tope] = v; else delete tp[this.dataset.tope]; S.cfg = Object.assign({}, S.cfg, { topes: tp }); guardarCfgYa(); renderStats(); });
+    });
+  }
+  [].forEach.call($('topesForm').querySelectorAll('input'), function (inp) { if (document.activeElement !== inp) { var v = (S.cfg.topes || {})[inp.dataset.tope]; inp.value = v ? B.fmtNum(v, 0) : ''; } });
+}
+function fechaCorta(iso) { var d = new Date(iso + 'T12:00:00'); return ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][d.getDay()] + ' ' + Number(iso.slice(8)) + '/' + Number(iso.slice(5, 7)); }
 
 /* ---------- alta de usuarios ---------- */
 function mostrarOnb() {
