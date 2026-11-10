@@ -318,9 +318,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 
-<script src="fb.bundle.js?v=20"></script>
-<script src="shim.js?v=20"></script>
-<script src="builders.js?v=20"></script>
+<script src="fb.bundle.js?v=21"></script>
+<script src="shim.js?v=21"></script>
+<script src="builders.js?v=21"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -469,8 +469,10 @@ async function prepararImagen(file) {
   return { blob: blob, w: cv.width, h: cv.height };
 }
 function mostrarFoto(src) { $('preview').src = src; $('preview').classList.remove('hide'); $('picker').classList.add('hide'); $('otraFoto').classList.remove('hide'); $('btnLeer').classList.toggle('hide', !S.sample); }
+var ultimaFoto = null;
 async function onFoto() {
-  var inp = this, f = inp.files && inp.files[0]; if (!f) return;
+  var inp = this, f = inp.files && inp.files[0]; if (!f || f === ultimaFoto) return;
+  ultimaFoto = f;
   try { sessionStorage.removeItem('camara'); } catch (e) {}
   note($('readNote'), 'info', '<span class="spin"></span>Preparando la foto…');
   try { f = new Blob([await f.arrayBuffer()], { type: f.type || 'image/jpeg' }); } catch (e) {}
@@ -478,7 +480,12 @@ async function onFoto() {
   try { var p = await prepararImagen(f); S.blob = p.blob; S.dims = { w: p.w, h: p.h }; mostrarFoto(URL.createObjectURL(p.blob)); leerTicket(); }
   catch (e) { note($('readNote'), 'err', 'No pude abrir esa imagen. Probá con otra foto.'); }
 }
-$('foto').addEventListener('change', onFoto); $('fotoGal').addEventListener('change', onFoto);
+['foto', 'fotoGal'].forEach(function (id) { ['change', 'input'].forEach(function (ev) { $(id).addEventListener(ev, onFoto); }); });
+// En Android a veces no llega el aviso de "foto nueva" al volver de la cámara: al volver a la app, revisar si hay una foto esperando
+function revisarFoto() { ['foto', 'fotoGal'].forEach(function (id) { var i = $(id); if (i.files && i.files[0] && i.files[0] !== ultimaFoto) onFoto.call(i); }); }
+function alVolver() { [150, 600, 1500, 3000].forEach(function (ms) { setTimeout(revisarFoto, ms); }); }
+document.addEventListener('visibilitychange', function () { if (!document.hidden) alVolver(); });
+window.addEventListener('focus', alVolver); window.addEventListener('pageshow', alVolver);
 $('btnCam').onclick = function () { try { sessionStorage.setItem('camara', Date.now()); } catch (e) {} $('foto').click(); };
 $('btnLeer').onclick = function () { leerTicket(); }; $('btnGal').onclick = function () { $('fotoGal').click(); };
 $('otraFoto').onclick = function () { $('preview').classList.add('hide'); $('picker').classList.remove('hide'); this.classList.add('hide'); $('btnLeer').classList.add('hide'); };
