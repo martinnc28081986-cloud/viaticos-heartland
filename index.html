@@ -86,6 +86,14 @@ input:focus,select:focus{outline:2px solid var(--ac);outline-offset:-1px;border-
 .chip{display:inline-flex;align-items:center;gap:5px;padding:8px 12px;border:1px solid var(--bd);border-radius:999px;background:var(--card);font-size:13px;cursor:pointer;color:var(--tx)}
 .chip .ms{font-size:18px;color:var(--ac)}
 .chip.on{background:var(--ac);border-color:var(--ac);color:#fff}.chip.on .ms{color:#fff}
+.tb{position:relative;flex:none;display:inline-flex}.tb .dot{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid var(--card)}.tb .dot .ms{font-size:13px}
+.cic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none}.cic .ms{font-size:18px}
+.crow2{display:flex;align-items:center;gap:10px}.crow2>div{flex:1;min-width:0}
+.bar.st i{background:none;display:flex;flex-direction:column-reverse;overflow:hidden;opacity:.5}.bar.st.on i{opacity:1;outline:2px solid var(--nav,#0E2A47);outline-offset:2px}.bar.st i b{display:block;width:100%}
+.leg{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:10px;font-size:12px;color:var(--tx2)}.leg span{display:inline-flex;align-items:center;gap:5px}.leg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.kpi.k1{background:#E6F1FB;border-color:#B5D4F4}.kpi.k1 .sub,.kpi.k1 b{color:#0C447C}.kpi.k2{background:#EEEDFE;border-color:#CECBF6}.kpi.k2 .sub,.kpi.k2 b{color:#3C3489}
+.reint{border:1px solid #9FE1CB!important;background:#E1F5EE!important}.reint .sub,.reint b{color:#085041!important}
+.encurso{border:1px solid #FAC775;background:#FFF8EC}.encurso .sub,.encurso b{color:#633806}
 .picker{display:grid;grid-template-columns:1fr 1fr;gap:10px;border:1.5px dashed var(--bd);border-radius:14px;padding:14px;background:var(--card)}
 .picker button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 4px;border:0;border-radius:12px;background:var(--acbg);color:var(--ac);font-size:13px;font-weight:600;cursor:pointer}
 .picker button .ms{font-size:28px}
@@ -195,12 +203,12 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
     <div class="wrap" style="margin-top:14px">
       <div id="aReint"></div>
       <div class="kpis">
-        <div class="kpi"><span class="sub" id="kMesLbl">Este mes</span><b id="kMes">$ 0</b><span class="sub" id="kVar"></span></div>
-        <div class="kpi"><span class="sub">Promedio mensual</span><b id="kProm">$ 0</b><span class="sub" id="kProm2"></span></div>
+        <div class="kpi k1"><span class="sub" id="kMesLbl">Este mes</span><b id="kMes">$ 0</b><span class="sub" id="kVar"></span></div>
+        <div class="kpi k2"><span class="sub">Promedio mensual</span><b id="kProm">$ 0</b><span class="sub" id="kProm2"></span></div>
       </div>
       <div class="card" style="margin-top:12px">
         <div class="sub" style="margin-bottom:8px">Total por mes · tocá una barra</div>
-        <div class="bars" id="bars"></div><div class="barlbl" id="barLbl"></div>
+        <div class="bars" id="bars"></div><div class="barlbl" id="barLbl"></div><div class="leg" id="barLeg"></div>
       </div>
       <div class="card" id="aRitmo"></div>
       <div class="card" id="aKm"></div>
@@ -329,9 +337,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
   </div>
 </div>
 
-<script src="fb.bundle.js?v=28"></script>
-<script src="shim.js?v=28"></script>
-<script src="builders.js?v=28"></script>
+<script src="fb.bundle.js?v=29"></script>
+<script src="shim.js?v=29"></script>
+<script src="builders.js?v=29"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -440,8 +448,9 @@ function renderChips() {
   if (nafta) { var uk = ultimoKm(); $('fKm').placeholder = uk ? 'Última carga: ' + B.fmtNum(uk, 0) + ' km' : 'Lo que marca el tablero'; }
   $('chips').innerHTML = '';
   B.PRINCIPALES.forEach(function (g) {
-    var c = document.createElement('button'); c.type = 'button'; c.className = 'chip' + (S.grupo === g.id ? ' on' : '');
-    c.innerHTML = '<span class="ms">' + g.icon + '</span>' + esc(g.label);
+    var c = document.createElement('button'); c.type = 'button'; c.className = 'chip' + (S.grupo === g.id ? ' on' : ''), co = colorDe(g.id);
+    c.innerHTML = '<span class="ms" style="color:' + (S.grupo === g.id ? '#fff' : co[2]) + '">' + g.icon + '</span>' + esc(g.label);
+    if (S.grupo === g.id) { c.style.background = co[0]; c.style.borderColor = co[0]; }
     c.onclick = function () { S.grupo = g.id; renderChips(); $('formErr').classList.add('hide'); };
     $('chips').appendChild(c);
   });
@@ -729,12 +738,27 @@ $('borrar').onclick = async function () {
   catch (e) { note($('formErr'), 'err', 'No se pudo borrar.'); } finally { b.disabled = false; b.dataset.c = ''; b.innerHTML = '<span class="ms">delete</span>Borrar gasto'; }
 };
 
+/* ---------- colores por concepto ---------- */
+var COLORES = {
+  COMBUSTIBLE: ['#378ADD', '#E6F1FB', '#185FA5'], COMIDAS: ['#EF9F27', '#FAEEDA', '#854F0B'], PEAJES: ['#7F77DD', '#EEEDFE', '#534AB7'],
+  ESTACIONAMIENTO: ['#1D9E75', '#E1F5EE', '#0F6E56'], HOSPEDAJE: ['#D4537E', '#FBEAF0', '#993556'], 'TAXIS Y PASAJES': ['#D9A400', '#FFF4CC', '#7A5A00'],
+  AVION: ['#D85A30', '#FAECE7', '#993C1D'], 'REPARACION DE AUTO': ['#E24B4A', '#FCEBEB', '#A32D2D'], OTROS: ['#888780', '#F1EFE8', '#5F5E5A']
+};
+var POR_CODIGO = { '53330': 'COMBUSTIBLE', '53350': 'COMIDAS', '53320': 'PEAJES', '53340': 'HOSPEDAJE', '53310': 'TAXIS Y PASAJES', '53300': 'AVION', '60300': 'REPARACION DE AUTO' };
+function colorDe(id) {
+  id = id || 'OTROS'; if (COLORES[id]) return COLORES[id];
+  var m = String(id).match(/^\d(\d{4})/); var k = m ? POR_CODIGO['5' + m[1]] : null;
+  return COLORES[k || 'OTROS'];
+}
+function icoConcepto(id, cls) { var c = colorDe(id), g = B.grupoDe(id || 'OTROS'); return '<span class="' + (cls || 'cic') + '" style="background:' + c[1] + ';color:' + c[2] + '"><span class="ms">' + g.icon + '</span></span>'; }
+
 /* ---------- vistas ---------- */
 function itemGasto(t) {
   var g = B.grupoDe(t.grupo), ext = t.moneda && t.moneda !== 'ARS';
   var b = document.createElement('button'); b.className = 'item';
-  b.innerHTML = (t.assetId ? '<img class="thumb" alt="">' : '<span class="ic"><span class="ms">' + g.icon + '</span></span>') +
-    '<div class="i"><div>' + esc(t.proveedor || g.label) + '</div><div class="sub">' + esc(g.label) + ' · ' + esc(B.fechaAR(t.fecha).slice(0, 5)) + alertaTicket(t) + '</div></div>' +
+  var col = colorDe(t.grupo);
+  b.innerHTML = (t.assetId ? '<span class="tb"><img class="thumb" alt="">' + icoConcepto(t.grupo, 'dot') + '</span>' : icoConcepto(t.grupo, 'ic')) +
+    '<div class="i"><div>' + esc(t.proveedor || g.label) + '</div><div class="sub"><span style="color:' + col[2] + ';font-weight:500">' + esc(g.label) + '</span> · ' + esc(B.fechaAR(t.fecha).slice(0, 5)) + alertaTicket(t) + '</div></div>' +
     '<div class="amt">' + B.money(t.importe, t.moneda) + (ext ? '<span class="sub">≈ ' + sinCent(B.money(B.ars(t))) + '</span>' : '') + '</div>';
   if (t.assetId) fotoDe(t).then(function (u) { if (u) b.querySelector('img').src = u; });
   b.onclick = function () { editar(t); };
@@ -1071,7 +1095,15 @@ function renderStats() {
   var primero = con[0] || mes; lista = lista.filter(function (x) { return x >= primero || x === mes; });
   while (lista.length < 4) { var p = lista[lista.length - 1].split('-').map(Number); p[1]++; if (p[1] > 12) { p[1] = 1; p[0]++; } lista.push(p[0] + '-' + String(p[1]).padStart(2, '0')); }
   var max = Math.max.apply(null, lista.map(function (x) { return tm[x] ? tm[x].total : 0; }).concat([1]));
-  $('bars').innerHTML = lista.map(function (x) { var t = tm[x] ? tm[x].total : 0; return '<div class="bar' + (x === mes ? ' on' : '') + '" data-m="' + x + '">' + (t ? kfmt(t) : '') + '<i style="height:' + Math.max(t ? 4 : 0, Math.round(t / max * 110)) + 'px"></i></div>'; }).join('');
+  var usados = {};
+  $('bars').innerHTML = lista.map(function (x) {
+    var t = tm[x] ? tm[x].total : 0, gr = tm[x] ? tm[x].grupos : {};
+    var seg = Object.keys(gr).sort().map(function (id) { var c = colorDe(id); usados[c[0]] = B.grupoDe(id).label; return '<b style="height:' + (gr[id] / (t || 1) * 100) + '%;background:' + c[0] + '"></b>'; }).join('');
+    return '<div class="bar st' + (x === mes ? ' on' : '') + '" data-m="' + x + '">' + (t ? kfmt(t) : '') + '<i style="height:' + Math.max(t ? 4 : 0, Math.round(t / max * 110)) + 'px">' + seg + '</i></div>';
+  }).join('');
+  var vistos = {};
+  $('barLeg').innerHTML = Object.keys(COLORES).filter(function (k) { var c = COLORES[k][0]; if (!usados[c] || vistos[c]) return false; vistos[c] = 1; return true; })
+    .map(function (k) { return '<span><i style="background:' + COLORES[k][0] + '"></i>' + esc(usados[COLORES[k][0]]) + '</span>'; }).join('');
   $('barLbl').innerHTML = lista.map(function (x) { return '<span>' + nombreMes(x, true) + '</span>'; }).join('');
   [].forEach.call($('bars').children, function (b) { b.onclick = function () { S.statMes = b.dataset.m; renderStats(); }; });
   renderExtras(mes, prev, tm);
@@ -1081,7 +1113,7 @@ function renderStats() {
   $('porConc').innerHTML = gs.length ? gs.map(function (g) {
     var a = cur.grupos[g.id] || 0, b = ant ? ant.grupos[g.id] || 0 : 0, d = ant ? pct(a, b) : null;
     var dv = !ant ? '' : !b ? '<span class="up">nuevo</span>' : !a ? '<span class="down">−100%</span>' : '<span class="' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '+' : '') + d + '%</span>';
-    return '<div class="crow"><div class="t"><span>' + esc(g.label) + '</span><span>' + sinCent(B.money(a)) + ' ' + dv + '</span></div><div class="tr"><i style="width:' + Math.round(a / gmax * 100) + '%"></i></div></div>';
+    return '<div class="crow crow2">' + icoConcepto(g.id) + '<div><div class="t"><span>' + esc(g.label) + '</span><span>' + sinCent(B.money(a)) + ' ' + dv + '</span></div><div class="tr"><i style="width:' + Math.round(a / gmax * 100) + '%;background:' + colorDe(g.id)[0] + '"></i></div></div></div>';
   }).join('') : '<div class="empty">No hay gastos en este mes.</div>';
 }
 
@@ -1135,10 +1167,10 @@ function renderExtras(mes, prev, tm) {
   var h = '';
   if (pend.length) {
     var tp = pend.reduce(function (s, x) { return s + x.total; }, 0);
-    h += '<div class="card reint"><div class="toprow"><div><div class="sub" style="color:#185FA5">Reintegro pendiente</div><b style="font-size:22px;color:#0C447C">' + sinCent(B.money(tp)) + '</b><div class="sub" style="color:#185FA5">' + pend.map(function (x) { return esc(etiquetaRend(x.r)); }).join(' + ') + ' · rendida</div></div>' +
-      '<div style="text-align:right"><div class="sub" style="color:#185FA5">Cobrás el</div><b style="color:#0C447C">' + fechaCorta(pend[0].pago) + '</b></div></div></div>';
+    h += '<div class="card reint"><div class="toprow"><div><div class="sub">Reintegro pendiente</div><b style="font-size:22px">' + sinCent(B.money(tp)) + '</b><div class="sub" style="color:#185FA5">' + pend.map(function (x) { return esc(etiquetaRend(x.r)); }).join(' + ') + ' · rendida</div></div>' +
+      '<div style="text-align:right"><div class="sub">Cobrás el</div><b>' + fechaCorta(pend[0].pago) + '</b></div></div></div>';
   }
-  if (ab.length && prox) h += '<div class="card"><div class="sub">En curso sin rendir</div><b style="display:block;font-size:20px;white-space:nowrap;margin:2px 0">' + sinCent(B.money(ab.reduce(function (s, x) { return s + x.total; }, 0))) + '</b><div class="sub">Cierre de carga ' + fechaCorta(prox[0]) + ' · cobro ' + fechaCorta(prox[2]) + '</div></div>';
+  if (ab.length && prox) h += '<div class="card encurso"><div class="sub">En curso sin rendir</div><b style="display:block;font-size:20px;white-space:nowrap;margin:2px 0">' + sinCent(B.money(ab.reduce(function (s, x) { return s + x.total; }, 0))) + '</b><div class="sub">Cierre de carga ' + fechaCorta(prox[0]) + ' · cobro ' + fechaCorta(prox[2]) + '</div></div>';
   $('aReint').innerHTML = h;
   // Ritmo + días de gira
   var dias = {}; tsMes.forEach(function (t) { if (t.fecha) dias[t.fecha] = 1; });
@@ -1154,10 +1186,10 @@ function renderExtras(mes, prev, tm) {
     r += '<div style="margin-top:10px"><b>' + plural(nd, 'día', 'días') + ' con gastos</b> · ' + sinCent(B.money(cur.total / nd)) + ' por día</div>';
     // Promedio de cada concepto sobre los días en que hubo ese concepto (no sobre todo el mes)
     var pc = {};
-    tsMes.forEach(function (t) { if (!t.fecha) return; var g = B.grupoDe(t.grupo || 'OTROS'), k = g.label; pc[k] = pc[k] || { label: k, total: 0, dias: {}, max: 0 }; pc[k].total += B.ars(t); pc[k].dias[t.fecha] = (pc[k].dias[t.fecha] || 0) + B.ars(t); });
+    tsMes.forEach(function (t) { if (!t.fecha) return; var g = B.grupoDe(t.grupo || 'OTROS'), k = g.label; pc[k] = pc[k] || { label: k, id: t.grupo || 'OTROS', total: 0, dias: {}, max: 0 }; pc[k].total += B.ars(t); pc[k].dias[t.fecha] = (pc[k].dias[t.fecha] || 0) + B.ars(t); });
     var lista = Object.keys(pc).map(function (k) { var x = pc[k], nd2 = Object.keys(x.dias).length; x.nd = nd2; x.prom = x.total / nd2; x.max = Math.max.apply(null, Object.keys(x.dias).map(function (f) { return x.dias[f]; })); return x; }).sort(function (a, b) { return b.prom - a.prom; });
     r += '<div class="sub" style="margin:12px 0 2px">Promedio por día con gasto, por concepto</div>' + lista.map(function (x) {
-      return '<div class="crow"><div class="t"><span>' + esc(x.label) + ' <span class="sub">· ' + plural(x.nd, 'día', 'días') + '</span></span><b>' + sinCent(B.money(x.prom)) + '</b></div><div class="sub" style="margin-top:2px">total ' + sinCent(B.money(x.total)) + (x.nd > 1 ? ' · día más alto ' + sinCent(B.money(x.max)) : '') + '</div></div>';
+      return '<div class="crow crow2">' + icoConcepto(x.id) + '<div><div class="t"><span>' + esc(x.label) + ' <span class="sub">· ' + plural(x.nd, 'día', 'días') + '</span></span><b>' + sinCent(B.money(x.prom)) + '</b></div><div class="sub" style="margin-top:2px">total ' + sinCent(B.money(x.total)) + (x.nd > 1 ? ' · día más alto ' + sinCent(B.money(x.max)) : '') + '</div></div></div>';
     }).join('');
   } else r += '<div class="empty">Sin gastos en este mes.</div>';
   $('aRitmo').innerHTML = r;
