@@ -19,7 +19,7 @@
   // Guardar la sesión también en localStorage: algunos celulares borran IndexedDB al cerrar la app
   var persistReady = FB.setPersistence(auth, FB.browserLocalPersistence).catch(function () {});
   var fs;
-  try { fs = FB.initializeFirestore(app, { localCache: FB.persistentLocalCache() }); }
+  try { fs = FB.initializeFirestore(app, { localCache: FB.persistentLocalCache({ tabManager: FB.persistentMultipleTabManager() }) }); }
   catch (e) { fs = FB.initializeFirestore(app, {}); }
   var ai = FB.getAI(app, { backend: new FB.GoogleAIBackend() });
   var model = FB.getGenerativeModel(ai, { model: MODELO, generationConfig: { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingBudget: 0 } } });
