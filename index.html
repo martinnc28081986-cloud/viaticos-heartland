@@ -317,10 +317,19 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
   </nav>
 </div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
+<div id="camOv" class="hide" style="position:fixed;inset:0;background:#000;z-index:80;flex-direction:column">
+  <video id="camVid" playsinline autoplay muted style="flex:1;min-height:0;width:100%;object-fit:contain;background:#000"></video>
+  <div style="color:#cfd6df;font-size:13px;text-align:center;padding:8px 16px 0">Encuadrá el ticket entero y que se lea bien</div>
+  <div style="display:flex;align-items:center;justify-content:space-around;padding:14px 0 calc(22px + env(safe-area-inset-bottom))">
+    <button type="button" id="camX" aria-label="Cerrar cámara" style="width:52px;height:52px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff"><span class="ms">close</span></button>
+    <button type="button" id="camShot" aria-label="Sacar foto" style="width:76px;height:76px;border-radius:50%;border:5px solid #fff;background:rgba(255,255,255,.3)"></button>
+    <button type="button" id="camGal" aria-label="Elegir de la galería" style="width:52px;height:52px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff"><span class="ms">image</span></button>
+  </div>
+</div>
 
-<script src="fb.bundle.js?v=21"></script>
-<script src="shim.js?v=21"></script>
-<script src="builders.js?v=21"></script>
+<script src="fb.bundle.js?v=22"></script>
+<script src="shim.js?v=22"></script>
+<script src="builders.js?v=22"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -477,6 +486,10 @@ async function onFoto() {
   note($('readNote'), 'info', '<span class="spin"></span>Preparando la foto…');
   try { f = new Blob([await f.arrayBuffer()], { type: f.type || 'image/jpeg' }); } catch (e) {}
   inp.value = '';
+  procesarArchivo(f);
+}
+async function procesarArchivo(f) {
+  note($('readNote'), 'info', '<span class="spin"></span>Preparando la foto…');
   try { var p = await prepararImagen(f); S.blob = p.blob; S.dims = { w: p.w, h: p.h }; mostrarFoto(URL.createObjectURL(p.blob)); leerTicket(); }
   catch (e) { note($('readNote'), 'err', 'No pude abrir esa imagen. Probá con otra foto.'); }
 }
@@ -486,7 +499,37 @@ function revisarFoto() { ['foto', 'fotoGal'].forEach(function (id) { var i = $(i
 function alVolver() { [150, 600, 1500, 3000].forEach(function (ms) { setTimeout(revisarFoto, ms); }); }
 document.addEventListener('visibilitychange', function () { if (!document.hidden) alVolver(); });
 window.addEventListener('focus', alVolver); window.addEventListener('pageshow', alVolver);
-$('btnCam').onclick = function () { try { sessionStorage.setItem('camara', Date.now()); } catch (e) {} $('foto').click(); };
+// Cámara dentro de la app (así Android no cierra la app al abrir la cámara del celu)
+var camStream = null;
+function camaraNativa() { try { sessionStorage.setItem('camara', Date.now()); } catch (e) {} $('foto').click(); }
+async function abrirCamara() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { camaraNativa(); return; }
+  try { camStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 2160 } } }); }
+  catch (e) {
+    if (e && e.name === 'NotAllowedError') note($('readNote'), 'warn', 'La app no tiene permiso para usar la cámara. Habilitalo en los permisos del sitio (candado junto a la dirección) o usá Galería.');
+    else camaraNativa();
+    return;
+  }
+  $('camVid').srcObject = camStream; $('camOv').classList.remove('hide'); $('camOv').style.display = 'flex';
+  history.pushState({ cam: 1 }, '');
+}
+function cerrarCamara(volver) {
+  if (camStream) camStream.getTracks().forEach(function (t) { t.stop(); });
+  camStream = null; $('camVid').srcObject = null; $('camOv').classList.add('hide'); $('camOv').style.display = '';
+  if (volver && history.state && history.state.cam) history.back();
+}
+window.addEventListener('popstate', function () { if (camStream) cerrarCamara(false); });
+$('camX').onclick = function () { cerrarCamara(true); };
+$('camGal').onclick = function () { cerrarCamara(true); $('fotoGal').click(); };
+$('camShot').onclick = async function () {
+  var v = $('camVid'); if (!v.videoWidth) return;
+  var cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight;
+  cv.getContext('2d').drawImage(v, 0, 0);
+  var blob = await new Promise(function (r) { cv.toBlob(r, 'image/jpeg', 0.92); });
+  cerrarCamara(true);
+  if (blob) procesarArchivo(blob);
+};
+$('btnCam').onclick = abrirCamara;
 $('btnLeer').onclick = function () { leerTicket(); }; $('btnGal').onclick = function () { $('fotoGal').click(); };
 $('otraFoto').onclick = function () { $('preview').classList.add('hide'); $('picker').classList.remove('hide'); this.classList.add('hide'); $('btnLeer').classList.add('hide'); };
 $('preview').onclick = function () { $('ovImg').src = this.src; $('overlay').classList.remove('hide'); };
