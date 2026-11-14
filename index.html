@@ -329,9 +329,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
   </div>
 </div>
 
-<script src="fb.bundle.js?v=24"></script>
-<script src="shim.js?v=24"></script>
-<script src="builders.js?v=24"></script>
+<script src="fb.bundle.js?v=25"></script>
+<script src="shim.js?v=25"></script>
+<script src="builders.js?v=25"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -482,40 +482,81 @@ async function prepararImagen(file) {
   try { sc2 = escanear(cv); scan = await new Promise(function (r) { sc2.toBlob(r, 'image/jpeg', 0.85); }); } catch (e) { sc2 = cv; }
   return { blob: scan || blob, orig: blob, scan: scan, w: scan ? sc2.width : cv.width, h: scan ? sc2.height : cv.height, wo: cv.width, ho: cv.height };
 }
-// Efecto "escaneado": gris, luz pareja (papel blanco aunque haya sombras) y más contraste en el texto
+// Efecto "escaneado": detecta el papel (claro, sin color y liso), recorta el ticket, deja blanco el fondo,
+// empareja la luz (papel blanco aunque haya sombras) y sube el contraste del texto
 function escanear(cv) {
-  var w = cv.width, h = cv.height, ctx = cv.getContext('2d'), img = ctx.getImageData(0, 0, w, h), d = img.data;
-  var L = new Float32Array(w * h);
-  for (var i = 0, j = 0; i < d.length; i += 4, j++) L[j] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-  // Fondo: grilla chica con el máximo de cada celda (borra el texto), suavizada
-  var cs = Math.max(8, Math.round(Math.max(w, h) / 60)), gw = Math.ceil(w / cs), gh = Math.ceil(h / cs), G = new Float32Array(gw * gh);
-  for (var gy = 0; gy < gh; gy++) for (var gx = 0; gx < gw; gx++) {
-    var arr = [], y1 = Math.min(h, (gy + 1) * cs), x1 = Math.min(w, (gx + 1) * cs);
-    for (var y = gy * cs; y < y1; y += 2) for (var x = gx * cs; x < x1; x += 2) arr.push(L[y * w + x]);
-    arr.sort(function (a, b) { return a - b; }); G[gy * gw + gx] = arr[Math.floor(arr.length * 0.9)] || 255;
+  var w = cv.width, h = cv.height, ctx = cv.getContext('2d'), img = ctx.getImageData(0, 0, w, h), d = img.data, N = w * h;
+  var L = new Float32Array(N), SAT = new Float32Array(N);
+  for (var i = 0, j = 0; i < d.length; i += 4, j++) {
+    var r = d[i], g = d[i + 1], b = d[i + 2];
+    L[j] = 0.299 * r + 0.587 * g + 0.114 * b; SAT[j] = Math.max(r, g, b) - Math.min(r, g, b);
   }
-  var dil = function (A) { var B = new Float32Array(A.length); for (var y = 0; y < gh; y++) for (var x = 0; x < gw; x++) { var m = 0; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) { var yy = y + dy, xx = x + dx; if (yy >= 0 && yy < gh && xx >= 0 && xx < gw) m = Math.max(m, A[yy * gw + xx]); } B[y * gw + x] = m; } return B; };
-  var blur = function (A) { var B = new Float32Array(A.length); for (var y = 0; y < gh; y++) for (var x = 0; x < gw; x++) { var s2 = 0, n = 0; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) { var yy = y + dy, xx = x + dx; if (yy >= 0 && yy < gh && xx >= 0 && xx < gw) { s2 += A[yy * gw + xx]; n++; } } B[y * gw + x] = s2 / n; } return B; };
-  // Dónde está el papel: celdas claras comparadas con lo más claro de la foto
-  var srt = Array.prototype.slice.call(G).sort(function (a, b) { return a - b; }), pmax = srt[Math.floor(srt.length * 0.95)], thr = 0.35 * pmax;
-  var M = blur(G), nIn = 0, bx0 = gw, by0 = gh, bx1 = -1, by1 = -1;
-  for (var gy2 = 0; gy2 < gh; gy2++) for (var gx2 = 0; gx2 < gw; gx2++) if (M[gy2 * gw + gx2] >= thr) { nIn++; bx0 = Math.min(bx0, gx2); by0 = Math.min(by0, gy2); bx1 = Math.max(bx1, gx2); by1 = Math.max(by1, gy2); }
-  var frac = nIn / (gw * gh), conFondo = frac > 0.08 && frac < 0.9;
-  G = blur(blur(dil(G)));
+  var cs = Math.max(8, Math.round(Math.max(w, h) / 70)), gw = Math.ceil(w / cs), gh = Math.ceil(h / cs), GN = gw * gh;
+  var G = new Float32Array(GN), SC = new Float32Array(GN), SM = new Float32Array(GN);
+  for (var gy = 0; gy < gh; gy++) for (var gx = 0; gx < gw; gx++) {
+    var arr = [], ss = 0, sq = 0, n = 0, y1 = Math.min(h, (gy + 1) * cs), x1 = Math.min(w, (gx + 1) * cs);
+    for (var y = gy * cs; y < y1; y += 2) for (var x = gx * cs; x < x1; x += 2) { var q = y * w + x; arr.push(L[q]); ss += SAT[q]; n++; }
+    arr.sort(function (a, b) { return a - b; });
+    var p90 = arr[Math.floor(arr.length * 0.9)] || 255, p50 = arr[Math.floor(arr.length * 0.5)] || 255;
+    G[gy * gw + gx] = p90;
+    // Papel: claro (mediana alta), poco color y parejo (la textura de la mesa sube p90-p50 aunque haya texto)
+    SM[gy * gw + gx] = ss / Math.max(1, n);
+    SC[gy * gw + gx] = p50 - 1.0 * SM[gy * gw + gx];
+  }
+  var nb = function (A, fn) { var B = new Float32Array(A.length); for (var y = 0; y < gh; y++) for (var x = 0; x < gw; x++) { var acc = fn === 'max' ? -1e9 : fn === 'min' ? 1e9 : 0, c = 0; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) { var yy = y + dy, xx = x + dx; if (yy < 0 || yy >= gh || xx < 0 || xx >= gw) continue; var v = A[yy * gw + xx]; if (fn === 'max') acc = Math.max(acc, v); else if (fn === 'min') acc = Math.min(acc, v); else { acc += v; c++; } } B[y * gw + x] = fn === 'avg' ? acc / c : acc; } return B; };
+  // Umbral de Otsu sobre el puntaje para separar papel de fondo
+  var mn = 1e9, mx = -1e9; for (var k = 0; k < GN; k++) { mn = Math.min(mn, SC[k]); mx = Math.max(mx, SC[k]); }
+  var bins = 64, hist = new Array(bins).fill(0); for (k = 0; k < GN; k++) hist[Math.min(bins - 1, Math.floor((SC[k] - mn) / (mx - mn + 1e-6) * bins))]++;
+  var tot = GN, sumAll = 0; for (k = 0; k < bins; k++) sumAll += k * hist[k];
+  var wB = 0, sumB = 0, best = -1, tb = 0; for (k = 0; k < bins; k++) { wB += hist[k]; if (!wB) continue; var wF = tot - wB; if (!wF) break; sumB += k * hist[k]; var mB = sumB / wB, mF = (sumAll - sumB) / wF, bt = wB * wF * (mB - mF) * (mB - mF); if (bt > best) { best = bt; tb = k; } }
+  var thr = mn + (tb + 1) / bins * (mx - mn);
+  var M = new Uint8Array(GN); for (k = 0; k < GN; k++) M[k] = SC[k] > thr ? 1 : 0;
+  // Componente más grande (el ticket)
+  var lab = new Int32Array(GN).fill(-1), bestC = -1, bestN = 0, comp = 0;
+  for (k = 0; k < GN; k++) if (M[k] && lab[k] < 0) {
+    var st = [k], cnt = 0; lab[k] = comp;
+    while (st.length) { var c0 = st.pop(), cx = c0 % gw, cy = (c0 - cx) / gw; cnt++;
+      for (var dy2 = -1; dy2 <= 1; dy2++) for (var dx2 = -1; dx2 <= 1; dx2++) { var yy2 = cy + dy2, xx2 = cx + dx2; if (yy2 < 0 || yy2 >= gh || xx2 < 0 || xx2 >= gw) continue; var c1 = yy2 * gw + xx2; if (M[c1] && lab[c1] < 0) { lab[c1] = comp; st.push(c1); } } }
+    if (cnt > bestN) { bestN = cnt; bestC = comp; } comp++;
+  }
+  var frac = bestN / GN, sepOk = false;
+  if (bestC >= 0) {
+    var inS = 0, inN = 0, outS = 0, outN = 0; for (k = 0; k < GN; k++) { if (lab[k] === bestC) { inS += G[k]; inN++; } else { outS += G[k]; outN++; } }
+    sepOk = outN > 0 && inS / inN - outS / outN > 25;
+  }
+  var recortar = sepOk && frac > 0.04 && frac < 0.9;
+  var P = new Float32Array(GN);
+  if (recortar) {
+    var Mb = new Uint8Array(GN); for (k = 0; k < GN; k++) Mb[k] = lab[k] === bestC ? 1 : 0;
+    // Rellenar agujeros (texto, logos, códigos QR dentro del ticket)
+    var fuera = new Uint8Array(GN), st2 = [];
+    for (var x3 = 0; x3 < gw; x3++) { st2.push(x3); st2.push((gh - 1) * gw + x3); } for (var y3 = 0; y3 < gh; y3++) { st2.push(y3 * gw); st2.push(y3 * gw + gw - 1); }
+    while (st2.length) { var c2 = st2.pop(); if (fuera[c2] || Mb[c2]) continue; fuera[c2] = 1; var cx2 = c2 % gw, cy2 = (c2 - cx2) / gw; if (cx2 > 0) st2.push(c2 - 1); if (cx2 < gw - 1) st2.push(c2 + 1); if (cy2 > 0) st2.push(c2 - gw); if (cy2 < gh - 1) st2.push(c2 + gw); }
+    // Dentro del rectángulo del ticket, solo es fondo lo que tiene color (madera, mantel); el papel con sombra se conserva
+    var sp = [], rx0 = gw, ry0 = gh, rx1 = -1, ry1 = -1;
+    for (k = 0; k < GN; k++) if (Mb[k]) { sp.push(SM[k]); var kx = k % gw, ky = (k - kx) / gw; rx0 = Math.min(rx0, kx); ry0 = Math.min(ry0, ky); rx1 = Math.max(rx1, kx); ry1 = Math.max(ry1, ky); }
+    sp.sort(function (a, b) { return a - b; }); var satPapel = sp[Math.floor(sp.length / 2)] || 0;
+    for (k = 0; k < GN; k++) { var kx2 = k % gw, ky2 = (k - kx2) / gw, dentro = kx2 >= rx0 && kx2 <= rx1 && ky2 >= ry0 && ky2 <= ry1; P[k] = !dentro ? 0 : (!fuera[k] || SM[k] <= satPapel + 14) ? 1 : 0; }
+    // Cerrar huecos chicos del borde y dejar un margen de seguridad para no comer texto
+    var Pf = nb(nb(nb(P, 'max'), 'min'), 'max'); P = nb(Pf, 'avg');
+  } else for (k = 0; k < GN; k++) P[k] = 1;
+  // Fondo de luz del papel: máximo local suavizado
+  var BG = nb(nb(nb(G, 'max'), 'avg'), 'avg');
   var bil = function (A, x, y) {
     var fy = Math.min(gh - 1.001, Math.max(0, (y + 0.5) / cs - 0.5)), y0 = Math.floor(fy), ty = fy - y0, fx = Math.min(gw - 1.001, Math.max(0, (x + 0.5) / cs - 0.5)), x0 = Math.floor(fx), tx = fx - x0;
     var a = A[y0 * gw + x0], b = gw > 1 ? A[y0 * gw + x0 + 1] : a, c = gh > 1 ? A[(y0 + 1) * gw + x0] : a, e = gw > 1 && gh > 1 ? A[(y0 + 1) * gw + x0 + 1] : a;
     return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + e * tx) * ty;
   };
-  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
-    var k = (y * w + x) * 4, v = 255;
-    var n2 = L[y * w + x] / Math.max(40, bil(G, x, y)); n2 = n2 >= 0.9 ? 1 : Math.pow(n2 / 0.9, 1.7); v = Math.round(255 * n2);
-    d[k] = d[k + 1] = d[k + 2] = v;
+  for (var yy = 0; yy < h; yy++) for (var xx = 0; xx < w; xx++) {
+    var q2 = yy * w + xx, k2 = q2 * 4, v = 255, pm = recortar ? bil(P, xx, yy) : 1;
+    if (pm > 0.35) { var n2 = L[q2] / Math.max(40, bil(BG, xx, yy)); n2 = n2 >= 0.9 ? 1 : Math.pow(n2 / 0.9, 1.7); v = Math.round(255 * n2); if (pm < 0.6) v = Math.round(v + (255 - v) * (0.6 - pm) / 0.25); }
+    d[k2] = d[k2 + 1] = d[k2 + 2] = v;
   }
   ctx.putImageData(img, 0, 0);
-  if (!conFondo) return cv;
-  // Recortar al papel (con un pequeño margen)
-  var px0 = Math.max(0, (bx0 - 1.5) * cs), py0 = Math.max(0, (by0 - 1.5) * cs), px1 = Math.min(w, (bx1 + 2.5) * cs), py1 = Math.min(h, (by1 + 2.5) * cs);
+  if (!recortar) return cv;
+  var bx0 = gw, by0 = gh, bx1 = -1, by1 = -1;
+  for (var gy4 = 0; gy4 < gh; gy4++) for (var gx4 = 0; gx4 < gw; gx4++) if (P[gy4 * gw + gx4] > 0.35) { bx0 = Math.min(bx0, gx4); by0 = Math.min(by0, gy4); bx1 = Math.max(bx1, gx4); by1 = Math.max(by1, gy4); }
+  var px0 = Math.max(0, bx0 * cs), py0 = Math.max(0, by0 * cs), px1 = Math.min(w, (bx1 + 1) * cs), py1 = Math.min(h, (by1 + 1) * cs);
   var out = document.createElement('canvas'); out.width = Math.round(px1 - px0); out.height = Math.round(py1 - py0);
   var oc = out.getContext('2d'); oc.fillStyle = '#fff'; oc.fillRect(0, 0, out.width, out.height); oc.drawImage(cv, -px0, -py0);
   return out;
