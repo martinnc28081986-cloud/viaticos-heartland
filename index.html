@@ -329,9 +329,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
   </div>
 </div>
 
-<script src="fb.bundle.js?v=25"></script>
-<script src="shim.js?v=25"></script>
-<script src="builders.js?v=25"></script>
+<script src="fb.bundle.js?v=26"></script>
+<script src="shim.js?v=26"></script>
+<script src="builders.js?v=26"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -1151,8 +1151,14 @@ function renderExtras(mes, prev, tm) {
       (dia >= 5 ? '<div style="text-align:right"><div class="sub">Proyección de cierre</div><b>' + sinCent(B.money(proy)) + '</b></div>' : '') + '</div><div class="prog"><i style="width:' + Math.round(dia / dm * 100) + '%"></i></div>';
   }
   if (nd) {
-    var po = function (ids) { return sinCent(B.money(sumaGrupos(cur.grupos, ids) / nd)); };
-    r += '<div style="margin-top:10px"><b>' + plural(nd, 'día', 'días') + ' con gastos</b> · ' + sinCent(B.money(cur.total / nd)) + ' por día</div><div class="sub">Por día: comida ' + po(GR_COMIDA) + ' · peajes ' + po(GR_PEAJE) + ' · nafta ' + po(GR_NAFTA) + '</div>';
+    r += '<div style="margin-top:10px"><b>' + plural(nd, 'día', 'días') + ' con gastos</b> · ' + sinCent(B.money(cur.total / nd)) + ' por día</div>';
+    // Promedio de cada concepto sobre los días en que hubo ese concepto (no sobre todo el mes)
+    var pc = {};
+    tsMes.forEach(function (t) { if (!t.fecha) return; var g = B.grupoDe(t.grupo || 'OTROS'), k = g.label; pc[k] = pc[k] || { label: k, total: 0, dias: {}, max: 0 }; pc[k].total += B.ars(t); pc[k].dias[t.fecha] = (pc[k].dias[t.fecha] || 0) + B.ars(t); });
+    var lista = Object.keys(pc).map(function (k) { var x = pc[k], nd2 = Object.keys(x.dias).length; x.nd = nd2; x.prom = x.total / nd2; x.max = Math.max.apply(null, Object.keys(x.dias).map(function (f) { return x.dias[f]; })); return x; }).sort(function (a, b) { return b.prom - a.prom; });
+    r += '<div class="sub" style="margin:12px 0 2px">Promedio por día con gasto, por concepto</div>' + lista.map(function (x) {
+      return '<div class="crow"><div class="t"><span>' + esc(x.label) + ' <span class="sub">· ' + plural(x.nd, 'día', 'días') + '</span></span><b>' + sinCent(B.money(x.prom)) + '</b></div><div class="sub" style="margin-top:2px">total ' + sinCent(B.money(x.total)) + (x.nd > 1 ? ' · día más alto ' + sinCent(B.money(x.max)) : '') + '</div></div>';
+    }).join('');
   } else r += '<div class="empty">Sin gastos en este mes.</div>';
   $('aRitmo').innerHTML = r;
   // Auto y km
