@@ -329,9 +329,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
   </div>
 </div>
 
-<script src="fb.bundle.js?v=27"></script>
-<script src="shim.js?v=27"></script>
-<script src="builders.js?v=27"></script>
+<script src="fb.bundle.js?v=28"></script>
+<script src="shim.js?v=28"></script>
+<script src="builders.js?v=28"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -1138,7 +1138,7 @@ function renderExtras(mes, prev, tm) {
     h += '<div class="card reint"><div class="toprow"><div><div class="sub" style="color:#185FA5">Reintegro pendiente</div><b style="font-size:22px;color:#0C447C">' + sinCent(B.money(tp)) + '</b><div class="sub" style="color:#185FA5">' + pend.map(function (x) { return esc(etiquetaRend(x.r)); }).join(' + ') + ' · rendida</div></div>' +
       '<div style="text-align:right"><div class="sub" style="color:#185FA5">Cobrás el</div><b style="color:#0C447C">' + fechaCorta(pend[0].pago) + '</b></div></div></div>';
   }
-  if (ab.length && prox) h += '<div class="card"><div class="sub">En curso sin rendir</div><div class="toprow"><b style="font-size:18px">' + sinCent(B.money(ab.reduce(function (s, x) { return s + x.total; }, 0))) + '</b><span class="sub">cierre de carga ' + fechaCorta(prox[0]) + ' · cobro ' + fechaCorta(prox[2]) + '</span></div></div>';
+  if (ab.length && prox) h += '<div class="card"><div class="sub">En curso sin rendir</div><b style="display:block;font-size:20px;white-space:nowrap;margin:2px 0">' + sinCent(B.money(ab.reduce(function (s, x) { return s + x.total; }, 0))) + '</b><div class="sub">Cierre de carga ' + fechaCorta(prox[0]) + ' · cobro ' + fechaCorta(prox[2]) + '</div></div>';
   $('aReint').innerHTML = h;
   // Ritmo + días de gira
   var dias = {}; tsMes.forEach(function (t) { if (t.fecha) dias[t.fecha] = 1; });
