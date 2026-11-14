@@ -123,6 +123,7 @@ input:focus,select:focus{outline:2px solid var(--ac);outline-offset:-1px;border-
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:9;padding:16px}
 .overlay img{max-width:100%;max-height:100%;border-radius:8px}
 details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
+#toastCierre:not(.hide){display:flex!important}#toastCancel{background:#fff;color:#0E2A47;border:0;border-radius:10px;padding:8px 14px;font-weight:600;font-size:14px}
 </style>
 </head>
 <body>
@@ -256,10 +257,10 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
         <div id="dlNote" class="note hide"></div>
       </div>
       <div class="card">
-        <b style="display:flex;align-items:center;gap:6px"><span class="ms" style="color:var(--ac)">mail</span>Enviar planillas por mail</b>
+        <b style="display:flex;align-items:center;gap:6px"><span class="ms" style="color:var(--ac)">mail</span>Enviar por mail y cerrar</b>
         <p class="sub" style="margin:6px 0 10px">Manda el Excel y el Word adjuntos desde tu Gmail.</p>
         <label class="field"><span>Enviar a</span><input type="text" id="cMail" inputmode="email" autocomplete="email"></label>
-        <button class="btn pri" id="btnMail"><span class="ms">send</span>Enviar planillas por mail</button>
+        <button class="btn pri" id="btnMail"><span class="ms">send</span>Enviar por mail y cerrar</button>
         <button class="btn hide" id="btnShare"><span class="ms">share</span>Compartir con otra app</button>
         <div id="mailNote" class="note hide"></div>
         <button class="btn" id="btnRendida"><span class="ms">task_alt</span><span id="btnRendidaTxt">Marcar como rendida</span></button>
@@ -316,6 +317,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
     <button data-v="rendiciones"><span class="ms">folder_open</span>Rendiciones</button>
   </nav>
 </div>
+<div id="toastCierre" class="hide" style="position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:70;background:#0E2A47;color:#fff;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;font-size:14px;box-shadow:0 6px 24px rgba(0,0,0,.25)"></div>
 <div id="overlay" class="overlay hide"><img id="ovImg" alt=""></div>
 <div id="camOv" class="hide" style="position:fixed;inset:0;background:#000;z-index:80;flex-direction:column">
   <video id="camVid" playsinline autoplay muted style="flex:1;min-height:0;width:100%;object-fit:contain;background:#000"></video>
@@ -327,9 +329,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
   </div>
 </div>
 
-<script src="fb.bundle.js?v=23"></script>
-<script src="shim.js?v=23"></script>
-<script src="builders.js?v=23"></script>
+<script src="fb.bundle.js?v=24"></script>
+<script src="shim.js?v=24"></script>
+<script src="builders.js?v=24"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
 if (!window.Builders || !window.FB || !window.claude) {
@@ -429,7 +431,7 @@ $('verTodos').onclick = function () { setView('gastos'); };
 $('qNuevo').onclick = function () { if (!rendSel()) { iniciarRend(); return; } abrirNuevo('inicio'); };
 function iniciarRend() { setView('rendiciones'); $('btnNueva').onclick(); }
 $('fab').onclick = function () { if (!rendSel()) { iniciarRend(); return; } abrirNuevo('gastos'); };
-$('qEnviar').onclick = function () { setView('enviar', 'inicio'); };
+$('qEnviar').onclick = function () { cierreRapido(); };
 function abrirNuevo(desde) { resetForm(); setView('nuevo', desde); }
 
 /* ---------- formulario de gasto ---------- */
@@ -879,19 +881,52 @@ function textoMail() {
   return 'Rendición de gastos ' + etiquetaRend(R) + '\n' + motivoCompleto() + '\nColaborador: ' + $('cColab').value.trim() + ' · CeCo ' + $('cCeco').value.trim() +
     '\nTotal: ' + B.money(totalArs(ts)) + ' (' + plural(ts.length, 'gasto', 'gastos') + ')\n\nAdjuntos: reporte de gastos (Excel) y comprobantes (Word).';
 }
-$('btnMail').onclick = async function () {
-  var to = $('cMail').value.trim(), btn = this, html = btn.innerHTML;
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { note($('mailNote'), 'err', 'Revisá la dirección de correo.'); return; }
-  if (!window.enviarMail) { note($('mailNote'), 'warn', 'El envío por mail no está disponible acá. Usá las descargas.'); return; }
+async function enviarPorMail() {
+  var to = $('cMail').value.trim(), btn = $('btnMail'), html = btn.innerHTML, R = rendSel(), ok = false;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { note($('mailNote'), 'err', 'Revisá la dirección de correo.'); return false; }
+  if (!window.enviarMail) { note($('mailNote'), 'warn', 'El envío por mail no está disponible acá. Usá las descargas.'); return false; }
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Armando y enviando…'; $('mailNote').classList.add('hide');
   try {
-    await window.enviarMail({ to: to, subject: 'Rendición de gastos ' + etiquetaRend(rendSel()) + ' – ' + $('cColab').value.trim(), body: textoMail(), files: await adjuntos() });
-    note($('mailNote'), 'ok', '✓ Mail enviado a ' + esc(to) + ' con el Excel y el Word adjuntos.');
+    await window.enviarMail({ to: to, subject: 'Rendición de gastos ' + etiquetaRend(R) + ' – ' + $('cColab').value.trim(), body: textoMail(), files: await adjuntos() });
+    ok = true;
+    var cerro = false;
+    if (R && R.estado !== 'rendida') {
+      S.cfg = Object.assign({}, S.cfg, { rendiciones: rends().map(function (r) { return r.id === R.id ? Object.assign({}, r, { estado: 'rendida', rendidaEl: hoyISO() }) : r; }) });
+      guardarCfgYa(); cerro = true;
+    }
+    render();
+    note($('mailNote'), 'ok', '✓ Mail enviado a ' + esc(to) + ' con el Excel y el Word adjuntos.' + (cerro ? ' La rendición quedó cerrada (rendida).' : ''));
   } catch (e) {
     var m = String((e && (e.code || e.message)) || e);
     note($('mailNote'), 'err', (/popup-closed|cancelled-popup|user-cancelled/.test(m) ? 'Cancelaste el permiso de Google. Tocá de nuevo cuando quieras.' : /popup-blocked/.test(m) ? 'El navegador bloqueó la ventana de Google. Permití ventanas emergentes para este sitio y probá de nuevo.' : 'No se pudo enviar el mail: ' + esc(m)) + (navigator.canShare ? '<br>Mientras tanto usá <b>Compartir con otra app</b> → Gmail: la dirección queda copiada para pegarla en "Para".' : ''));
   } finally { btn.disabled = false; btn.innerHTML = html; }
-};
+  return ok;
+}
+$('btnMail').onclick = function () { enviarPorMail(); };
+// Cerrar desde Inicio: si no hay nada para revisar, envía el mail directo (con unos segundos para cancelar) y deja la rendición rendida
+var cierreTimer = null;
+async function cierreRapido() {
+  var R = rendSel(), ts = ticketsMes();
+  renderEnviar();
+  var avisos = $('alertas').querySelectorAll('.note.warn, .note.err').length;
+  if (!R || !ts.length || R.estado === 'rendida' || avisos || !window.enviarMail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($('cMail').value.trim())) {
+    setView('enviar', 'inicio');
+    if (avisos && R && R.estado !== 'rendida') note($('mailNote'), 'warn', 'Antes de enviar, revisá los avisos de arriba. Si está todo bien, tocá <b>Enviar por mail y cerrar</b>.');
+    return;
+  }
+  var t = $('toastCierre');
+  t.innerHTML = '<span class="spin"></span><span>Preparando…</span>'; t.classList.remove('hide');
+  try { await window.prepararMail(); }
+  catch (e) { t.classList.add('hide'); setView('enviar', 'inicio'); note($('mailNote'), 'err', 'Google no dio el permiso para enviar el mail. Tocá <b>Enviar por mail y cerrar</b> para probar de nuevo.'); return; }
+  var seg = 4;
+  var pintar = function () { t.innerHTML = '<span style="flex:1">Enviando ' + esc(etiquetaRend(R)) + ' (' + plural(ts.length, 'gasto', 'gastos') + ', ' + sinCent(B.money(totalArs(ts))) + ') a ' + esc($('cMail').value.trim()) + ' en ' + seg + '…</span><button type="button" id="toastCancel">Cancelar</button>'; $('toastCancel').onclick = function () { clearInterval(cierreTimer); cierreTimer = null; t.classList.add('hide'); }; };
+  pintar();
+  cierreTimer = setInterval(async function () {
+    seg--; if (seg > 0) { pintar(); return; }
+    clearInterval(cierreTimer); cierreTimer = null; t.classList.add('hide');
+    setView('enviar', 'inicio'); await enviarPorMail();
+  }, 1000);
+}
 if (navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.txt', { type: 'text/plain' })] })) $('btnShare').classList.remove('hide');
 $('btnShare').onclick = async function () {
   var btn = this, html = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Armando archivos…';

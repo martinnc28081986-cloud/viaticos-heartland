@@ -145,6 +145,7 @@
   function b64(buf) { var s = '', b = new Uint8Array(buf); for (var i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
   function b64utf8(str) { return btoa(unescape(encodeURIComponent(str))); }
   function lineas(s) { return s.replace(/(.{76})/g, '$1\r\n'); }
+  window.prepararMail = function () { return tokenGmail(false); };
   window.enviarMail = async function (msg) {
     var bnd = 'viaticos_' + Date.now().toString(36);
     var partes = ['To: ' + msg.to, 'Subject: =?UTF-8?B?' + b64utf8(msg.subject) + '?=', 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="' + bnd + '"', '',
