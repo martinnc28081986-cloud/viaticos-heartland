@@ -23,6 +23,8 @@
   catch (e) { fs = FB.initializeFirestore(app, {}); }
   var ai = FB.getAI(app, { backend: new FB.GoogleAIBackend() });
   var model = FB.getGenerativeModel(ai, { model: MODELO, generationConfig: { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingLevel: 'low' } } });
+  // Plan B: la configuración que ya andaba (sin razonamiento)
+  var model2 = FB.getGenerativeModel(ai, { model: MODELO, generationConfig: { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingBudget: 0 } } });
 
   var user = null, resolveReady;
   var ready = new Promise(function (r) { resolveReady = r; });
@@ -103,7 +105,14 @@
           parts.push({ inlineData: { mimeType: imgs[i].type || 'image/jpeg', data: u.split(',')[1] } });
         }
         var r;
-        try { r = await model.generateContent(parts); }
+        try {
+          try { r = await model.generateContent(parts); }
+          catch (e0) {
+            if (/429|quota|RESOURCE_EXHAUSTED/i.test(String((e0 && e0.message) || e0))) throw e0;
+            console.warn('Lectura con razonamiento falló, uso plan B:', e0);
+            r = await model2.generateContent(parts);
+          }
+        }
         catch (e) {
           var msg = String((e && e.message) || e);
           if (opts && opts.signal && opts.signal.aborted) throw { code: 'cancelled' };
