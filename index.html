@@ -338,7 +338,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 
 <script src="fb.bundle.js?v=29"></script>
-<script src="shim.js?v=32"></script>
+<script src="shim.js?v=33"></script>
 <script src="builders.js?v=29"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
@@ -687,7 +687,7 @@ async function leerTicket() {
     if (r && r.moneda && B.MONEDAS.some(function (m) { return m.code === r.moneda; }) && libre('fMoneda')) { $('fMoneda').value = r.moneda; if (r.moneda !== 'ARS') leidos.push('moneda ' + r.moneda); }
     if (r && r.grupo && B.PRINCIPALES.some(function (g) { return g.id === r.grupo; }) && !S.grupo) { S.grupo = r.grupo; renderChips(); }
     actualizarMoneda();
-    if (leidos.length) note($('readNote'), 'ok', '✓ Leído del ticket (' + leidos.join(', ') + '). Revisá los datos antes de guardar.' + ($('fMoneda').value !== 'ARS' && !parseNum($('fTc').value) ? ' Completá el tipo de cambio.' : ''));
+    if (leidos.length) note($('readNote'), 'ok', '✓ Leído del ticket (' + leidos.join(', ') + '). Revisá los datos antes de guardar. <span style="opacity:.6;font-size:11px">[' + (window.ultimoModeloIA || '') + ']</span>' + ($('fMoneda').value !== 'ARS' && !parseNum($('fTc').value) ? ' Completá el tipo de cambio.' : ''));
     else note($('readNote'), 'warn', 'No pude leer los datos. Completalos a mano.');
   } catch (e) {
     if (e && e.code === 'cancelled') return;

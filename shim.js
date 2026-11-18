@@ -34,7 +34,7 @@
     for (var i = 0; i < MODELOS.length; i++) {
       var n = MODELOS[i];
       if (sinCupoHasta(n) > Date.now() && i < MODELOS.length - 1) continue;
-      try { return await getModelo(n).generateContent(parts); }
+      try { var res = await getModelo(n).generateContent(parts); window.ultimoModeloIA = n; return res; }
       catch (e) {
         var msg = String((e && e.message) || e); ult = e;
         if (/429|quota|RESOURCE_EXHAUSTED/i.test(msg)) { cupo = e; marcarSinCupo(n, /per ?day|PerDay|daily/i.test(msg) ? 6 * 3600000 : 90000); continue; }
