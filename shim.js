@@ -22,7 +22,7 @@
   try { fs = FB.initializeFirestore(app, { localCache: FB.persistentLocalCache({ tabManager: FB.persistentMultipleTabManager() }) }); }
   catch (e) { fs = FB.initializeFirestore(app, {}); }
   var ai = FB.getAI(app, { backend: new FB.GoogleAIBackend() });
-  var model = FB.getGenerativeModel(ai, { model: MODELO, generationConfig: { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingBudget: 0 } } });
+  var model = FB.getGenerativeModel(ai, { model: MODELO, generationConfig: { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingLevel: 'low' } } });
 
   var user = null, resolveReady;
   var ready = new Promise(function (r) { resolveReady = r; });

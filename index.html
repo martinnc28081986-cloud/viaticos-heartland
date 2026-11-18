@@ -338,7 +338,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 
 <script src="fb.bundle.js?v=29"></script>
-<script src="shim.js?v=29"></script>
+<script src="shim.js?v=30"></script>
 <script src="builders.js?v=29"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
@@ -486,10 +486,17 @@ async function prepararImagen(file) {
   var cv = document.createElement('canvas'); cv.width = Math.round(w * sc); cv.height = Math.round(h * sc);
   cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
   var blob = await new Promise(function (r) { cv.toBlob(r, 'image/jpeg', 0.82); });
+  // Copia para la IA: la foto original (sin el efecto escaneado) y con más resolución, así lee bien los números chicos
+  var ai = null;
+  try {
+    var sa = Math.min(1, 3072 / Math.max(w, h)), ca = document.createElement('canvas'); ca.width = Math.round(w * sa); ca.height = Math.round(h * sa);
+    ca.getContext('2d').drawImage(bmp, 0, 0, ca.width, ca.height);
+    ai = await new Promise(function (r) { ca.toBlob(r, 'image/jpeg', 0.9); });
+  } catch (e) { ai = null; }
   var scan = null;
   var sc2 = cv;
   try { sc2 = escanear(cv); scan = await new Promise(function (r) { sc2.toBlob(r, 'image/jpeg', 0.85); }); } catch (e) { sc2 = cv; }
-  return { blob: scan || blob, orig: blob, scan: scan, w: scan ? sc2.width : cv.width, h: scan ? sc2.height : cv.height, wo: cv.width, ho: cv.height };
+  return { blob: scan || blob, orig: blob, scan: scan, ai: ai || blob, w: scan ? sc2.width : cv.width, h: scan ? sc2.height : cv.height, wo: cv.width, ho: cv.height };
 }
 // Efecto "escaneado": detecta el papel (claro, sin color y liso), recorta el ticket, deja blanco el fondo,
 // empareja la luz (papel blanco aunque haya sombras) y sube el contraste del texto
@@ -616,9 +623,22 @@ $('camX').onclick = function () { cerrarCamara(true); };
 $('camGal').onclick = function () { cerrarCamara(true); $('fotoGal').click(); };
 $('camShot').onclick = async function () {
   var v = $('camVid'); if (!v.videoWidth) return;
-  var cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight;
-  cv.getContext('2d').drawImage(v, 0, 0);
-  var blob = await new Promise(function (r) { cv.toBlob(r, 'image/jpeg', 0.92); });
+  var blob = null;
+  // Foto real de la cámara (máxima resolución y con enfoque), no un cuadro del video
+  try {
+    var tr = camStream && camStream.getVideoTracks()[0];
+    if (tr && window.ImageCapture) {
+      var ic = new ImageCapture(tr), pc = null;
+      try { pc = await ic.getPhotoCapabilities(); } catch (e) {}
+      var op = pc && pc.imageWidth && pc.imageWidth.max ? { imageWidth: pc.imageWidth.max, imageHeight: pc.imageHeight.max } : {};
+      blob = await ic.takePhoto(op);
+    }
+  } catch (e) { blob = null; }
+  if (!blob) {
+    var cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight;
+    cv.getContext('2d').drawImage(v, 0, 0);
+    blob = await new Promise(function (r) { cv.toBlob(r, 'image/jpeg', 0.95); });
+  }
   cerrarCamara(true);
   if (blob) procesarArchivo(blob);
 };
@@ -643,17 +663,20 @@ async function leerTicket() {
   var prompt = 'La imagen es un ticket, factura o comprobante de pago (o captura de un pago, p. ej. TelePASE/peaje, estacionamiento, combustible, comida, hotel, taxi). ' +
     'Puede ser de Argentina o de otro país. Extraé los datos. En Argentina los importes usan punto para miles y coma para decimales ("98.450,00" = 98450.00). ' +
     'El importe es el TOTAL pagado (si hay varios movimientos, la suma). La moneda es la del comprobante: ARS si es de Argentina en pesos; si no, la que corresponda. ' +
+    'Las fechas argentinas van día/mes/año ("05/11/26" = 5 de noviembre de 2026), nunca mes/día. ' +
+    'Buscá el total final ("TOTAL", "TOTAL A PAGAR", "IMPORTE TOTAL"); no uses subtotal, IVA, "SU PAGO", "EFECTIVO", "VUELTO", ni CUIT, CAE, número de comprobante o de punto de venta. ' +
+    'El proveedor es el nombre comercial del local o la estación (no la razón social S.A./S.R.L. si hay nombre de fantasía). Si un dato no se lee con claridad, devolvé null en vez de adivinar. ' +
     'Respondé SOLO con un objeto JSON: {"fecha":"YYYY-MM-DD" o null,"proveedor":"nombre corto" o null,"importe":número o null,"litros":número o null (solo si es combustible: litros cargados),"moneda":uno de [' + monedas + '],"grupo":uno de [' + grupos + '] o null}. ' +
     'Ejemplo: {"fecha":"2026-10-14","proveedor":"YPF","importe":98450,"moneda":"ARS","grupo":"COMBUSTIBLE"}';
   try {
     var r;
-    try { r = await S.sample.json(prompt, { images: [S.blob], signal: ctl.signal }); }
+    try { r = await S.sample.json(prompt, { images: [(S.fotoV && S.fotoV.ai) || S.blob], signal: ctl.signal }); }
     catch (e1) {
       if (!e1 || !/upstream_error|invalid_json|rate_limited/.test(e1.code) || ctl.signal.aborted) throw e1;
       note($('readNote'), 'info', '<span class="spin"></span>Leyendo el ticket… (segundo intento)');
       await new Promise(function (ok) { setTimeout(ok, e1.code === 'rate_limited' ? 6000 : 1500); });
       if (ctl.signal.aborted) return;
-      r = await S.sample.json(prompt, { images: [S.blob], signal: ctl.signal });
+      r = await S.sample.json(prompt, { images: [(S.fotoV && S.fotoV.ai) || S.blob], signal: ctl.signal });
     }
     if (ctl.signal.aborted) return;
     var libre = function (id) { return !$(id).dataset.touched; }, leidos = [];
