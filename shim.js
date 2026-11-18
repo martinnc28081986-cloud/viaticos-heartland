@@ -22,9 +22,28 @@
   try { fs = FB.initializeFirestore(app, { localCache: FB.persistentLocalCache({ tabManager: FB.persistentMultipleTabManager() }) }); }
   catch (e) { fs = FB.initializeFirestore(app, {}); }
   var ai = FB.getAI(app, { backend: new FB.GoogleAIBackend() });
-  var model = FB.getGenerativeModel(ai, { model: MODELO, generationConfig: { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingLevel: 'low' } } });
-  // Plan B: la configuración que ya andaba (sin razonamiento)
-  var model2 = FB.getGenerativeModel(ai, { model: MODELO, generationConfig: { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingBudget: 0 } } });
+  // Modelos en orden: si uno se queda sin cupo gratis (o no existe), se pasa al siguiente; cada modelo tiene su propio cupo
+  var MODELOS = [MODELO, 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+  var cfgIA = { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingBudget: 0 } };
+  var modelos = {};
+  function getModelo(n) { return modelos[n] || (modelos[n] = FB.getGenerativeModel(ai, { model: n, generationConfig: cfgIA })); }
+  function sinCupoHasta(n) { try { return Number(localStorage.getItem('iaSinCupo_' + n)) || 0; } catch (e) { return 0; } }
+  function marcarSinCupo(n, ms) { try { localStorage.setItem('iaSinCupo_' + n, Date.now() + ms); } catch (e) {} }
+  async function generar(parts) {
+    var ult = null, cupo = null;
+    for (var i = 0; i < MODELOS.length; i++) {
+      var n = MODELOS[i];
+      if (sinCupoHasta(n) > Date.now() && i < MODELOS.length - 1) continue;
+      try { return await getModelo(n).generateContent(parts); }
+      catch (e) {
+        var msg = String((e && e.message) || e); ult = e;
+        if (/429|quota|RESOURCE_EXHAUSTED/i.test(msg)) { cupo = e; marcarSinCupo(n, /per ?day|PerDay|daily/i.test(msg) ? 6 * 3600000 : 90000); continue; }
+        if (/404|not found|NOT_FOUND|not supported/i.test(msg)) { marcarSinCupo(n, 24 * 3600000); continue; }
+        throw e;
+      }
+    }
+    throw cupo || ult || new Error('429 sin cupo');
+  }
 
   var user = null, resolveReady;
   var ready = new Promise(function (r) { resolveReady = r; });
@@ -105,14 +124,7 @@
           parts.push({ inlineData: { mimeType: imgs[i].type || 'image/jpeg', data: u.split(',')[1] } });
         }
         var r;
-        try {
-          try { r = await model.generateContent(parts); }
-          catch (e0) {
-            if (/429|quota|RESOURCE_EXHAUSTED/i.test(String((e0 && e0.message) || e0))) throw e0;
-            console.warn('Lectura con razonamiento falló, uso plan B:', e0);
-            r = await model2.generateContent(parts);
-          }
-        }
+        try { r = await generar(parts); }
         catch (e) {
           var msg = String((e && e.message) || e);
           if (opts && opts.signal && opts.signal.aborted) throw { code: 'cancelled' };

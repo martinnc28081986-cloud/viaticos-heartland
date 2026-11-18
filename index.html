@@ -338,7 +338,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 
 <script src="fb.bundle.js?v=29"></script>
-<script src="shim.js?v=31"></script>
+<script src="shim.js?v=32"></script>
 <script src="builders.js?v=29"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
@@ -672,9 +672,9 @@ async function leerTicket() {
     var r;
     try { r = await S.sample.json(prompt, { images: [(S.fotoV && S.fotoV.ai) || S.blob], signal: ctl.signal }); }
     catch (e1) {
-      if (!e1 || !/upstream_error|invalid_json|rate_limited/.test(e1.code) || ctl.signal.aborted) throw e1;
+      if (!e1 || !/upstream_error|invalid_json/.test(e1.code) || ctl.signal.aborted) throw e1;
       note($('readNote'), 'info', '<span class="spin"></span>Leyendo el ticket… (segundo intento)');
-      await new Promise(function (ok) { setTimeout(ok, e1.code === 'rate_limited' ? 6000 : 1500); });
+      await new Promise(function (ok) { setTimeout(ok, 1500); });
       if (ctl.signal.aborted) return;
       r = await S.sample.json(prompt, { images: [(S.fotoV && S.fotoV.orig) || S.blob], signal: ctl.signal });
     }
@@ -691,7 +691,7 @@ async function leerTicket() {
     else note($('readNote'), 'warn', 'No pude leer los datos. Completalos a mano.');
   } catch (e) {
     if (e && e.code === 'cancelled') return;
-    var m = { not_granted: 'Sin permiso para leer tickets automáticamente. Completá a mano.', rate_limited: 'Demasiadas lecturas seguidas. Esperá un momento o completá a mano.',
+    var m = { not_granted: 'Sin permiso para leer tickets automáticamente. Completá a mano.', rate_limited: 'Se agotó el cupo gratis de lecturas por ahora. Esperá un rato o completá a mano.',
       image_rejected: 'La imagen no se pudo leer. Probá con otra foto.', images_unavailable: 'La lectura automática no está disponible acá. Completá a mano.' };
     note($('readNote'), 'warn', (m[e && e.code] || 'No pude leer el ticket. Completá los datos a mano.') +
       (e && e.message ? ' <span style="opacity:.7;font-size:12px">(' + String(e.message).replace(/[<>&]/g, '').slice(0, 140) + ')</span>' : '') +
