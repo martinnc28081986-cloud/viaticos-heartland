@@ -22,27 +22,40 @@
   try { fs = FB.initializeFirestore(app, { localCache: FB.persistentLocalCache({ tabManager: FB.persistentMultipleTabManager() }) }); }
   catch (e) { fs = FB.initializeFirestore(app, {}); }
   var ai = FB.getAI(app, { backend: new FB.GoogleAIBackend() });
-  // Modelos en orden: si uno se queda sin cupo gratis (o no existe), se pasa al siguiente; cada modelo tiene su propio cupo
-  var MODELOS = [MODELO, 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
-  var cfgIA = { responseMimeType: 'application/json', temperature: 0, thinkingConfig: { thinkingBudget: 0 } };
+  // Modelos en orden: si uno falla (sin cupo, no existe o no acepta la configuración) se prueba el siguiente; cada modelo tiene su propio cupo gratis
+  var MODELOS = [MODELO, 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
   var modelos = {};
-  function getModelo(n) { return modelos[n] || (modelos[n] = FB.getGenerativeModel(ai, { model: n, generationConfig: cfgIA })); }
+  function getModelo(n, simple) {
+    var k = n + (simple ? '|s' : '');
+    var cfg = { responseMimeType: 'application/json', temperature: 0 };
+    if (!simple) cfg.thinkingConfig = { thinkingBudget: 0 };
+    return modelos[k] || (modelos[k] = FB.getGenerativeModel(ai, { model: n, generationConfig: cfg }));
+  }
   function sinCupoHasta(n) { try { return Number(localStorage.getItem('iaSinCupo_' + n)) || 0; } catch (e) { return 0; } }
   function marcarSinCupo(n, ms) { try { localStorage.setItem('iaSinCupo_' + n, Date.now() + ms); } catch (e) {} }
+  function resumenError(n, msg) {
+    var m = msg.match(/\[(\d{3})[^\]]*\]\s*([^(]{0,90})/);
+    return n.replace('gemini-', '') + ': ' + (m ? m[1] + ' ' + m[2].trim() : msg.slice(-90));
+  }
   async function generar(parts) {
-    var ult = null, cupo = null;
+    var errores = [], hubo429 = false;
     for (var i = 0; i < MODELOS.length; i++) {
       var n = MODELOS[i];
-      if (sinCupoHasta(n) > Date.now() && i < MODELOS.length - 1) continue;
-      try { var res = await getModelo(n).generateContent(parts); window.ultimoModeloIA = n; return res; }
-      catch (e) {
-        var msg = String((e && e.message) || e); ult = e;
-        if (/429|quota|RESOURCE_EXHAUSTED/i.test(msg)) { cupo = e; marcarSinCupo(n, /per ?day|PerDay|daily/i.test(msg) ? 6 * 3600000 : 90000); continue; }
-        if (/404|not found|NOT_FOUND|not supported/i.test(msg)) { marcarSinCupo(n, 24 * 3600000); continue; }
-        throw e;
+      if (sinCupoHasta(n) > Date.now()) { errores.push(n.replace('gemini-', '') + ': sin cupo'); continue; }
+      for (var simple = 0; simple < 2; simple++) {
+        try { var res = await getModelo(n, simple).generateContent(parts); window.ultimoModeloIA = n; return res; }
+        catch (e) {
+          var msg = String((e && e.message) || e);
+          console.warn('IA', n, msg);
+          if (/429|quota|RESOURCE_EXHAUSTED/i.test(msg)) { hubo429 = true; marcarSinCupo(n, /per ?day|PerDay|daily/i.test(msg) ? 6 * 3600000 : 90000); errores.push(resumenError(n, msg)); break; }
+          if (/404|not found|NOT_FOUND/i.test(msg)) { marcarSinCupo(n, 24 * 3600000); errores.push(resumenError(n, msg)); break; }
+          if (!simple && /\[400/.test(msg)) continue; // probar sin la configuración de razonamiento
+          errores.push(resumenError(n, msg)); break;
+        }
       }
     }
-    throw cupo || ult || new Error('429 sin cupo');
+    var err = new Error((hubo429 ? '429 ' : '') + errores.join(' · '));
+    throw err;
   }
 
   var user = null, resolveReady;
