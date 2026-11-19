@@ -338,7 +338,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 
 <script src="fb.bundle.js?v=29"></script>
-<script src="shim.js?v=35"></script>
+<script src="shim.js?v=36"></script>
 <script src="builders.js?v=29"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
@@ -489,9 +489,9 @@ async function prepararImagen(file) {
   // Copia para la IA: la foto original (sin el efecto escaneado) y con más resolución, así lee bien los números chicos
   var ai = null;
   try {
-    var sa = Math.min(1, 3072 / Math.max(w, h)), ca = document.createElement('canvas'); ca.width = Math.round(w * sa); ca.height = Math.round(h * sa);
+    var sa = Math.min(1, 2200 / Math.max(w, h)), ca = document.createElement('canvas'); ca.width = Math.round(w * sa); ca.height = Math.round(h * sa);
     ca.getContext('2d').drawImage(bmp, 0, 0, ca.width, ca.height);
-    ai = await new Promise(function (r) { ca.toBlob(r, 'image/jpeg', 0.9); });
+    ai = await new Promise(function (r) { ca.toBlob(r, 'image/jpeg', 0.85); });
   } catch (e) { ai = null; }
   var scan = null;
   var sc2 = cv;
@@ -691,7 +691,8 @@ async function leerTicket() {
     var r;
     try { r = await S.sample.json(prompt, { images: [(S.fotoV && S.fotoV.ai) || S.blob], signal: ctl.signal }); }
     catch (e1) {
-      if (!e1 || e1.code !== 'invalid_json' || ctl.signal.aborted) throw e1;
+      if (!e1 || !/invalid_json|network/.test(e1.code) || ctl.signal.aborted) throw e1;
+      if (e1.code === 'network' && !navigator.onLine) throw e1;
       note($('readNote'), 'info', '<span class="spin"></span>Leyendo el ticket… (segundo intento)');
       await new Promise(function (ok) { setTimeout(ok, 1500); });
       if (ctl.signal.aborted) return;
@@ -712,10 +713,11 @@ async function leerTicket() {
   } catch (e) {
     if (e && e.code === 'cancelled') return;
     var m = { not_granted: 'Sin permiso para leer tickets automáticamente. Completá a mano.', rate_limited: 'Se agotó el cupo gratis de lecturas por ahora. Esperá un rato o completá a mano.',
+      network: navigator.onLine ? 'No se pudo enviar la foto (conexión lenta o cortada). Probá de nuevo con mejor señal o completá a mano.' : 'Estás sin conexión. Completá los datos a mano o leé el ticket cuando vuelva la señal.',
       image_rejected: 'La imagen no se pudo leer. Probá con otra foto.', images_unavailable: 'La lectura automática no está disponible acá. Completá a mano.' };
     note($('readNote'), 'warn', (m[e && e.code] || 'No pude leer el ticket. Completá los datos a mano.') +
       (e && e.message ? ' <span style="opacity:.7;font-size:12px">(' + String(e.message).replace(/[<>&]/g, '').slice(0, 400) + ')</span>' : '') +
-      (e && (e.code === 'upstream_error' || e.code === 'invalid_json') ? ' <button class="lnk" id="retryRead">Reintentar</button>' : ''));
+      (e && (e.code === 'upstream_error' || e.code === 'invalid_json' || e.code === 'network') ? ' <button class="lnk" id="retryRead">Reintentar</button>' : ''));
     var rr = $('retryRead'); if (rr) rr.onclick = function () { leerTicket(); };
     if (e && (e.code === 'not_granted' || e.code === 'images_unavailable' || e.code === 'sampling_disabled')) S.sample = null;
   }

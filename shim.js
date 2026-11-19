@@ -47,6 +47,8 @@
         catch (e) {
           var msg = String((e && e.message) || e);
           console.warn('IA', n, msg);
+          // Error de red (la foto no llegó a salir): no tiene sentido probar otros modelos
+          if (/Failed to fetch|NetworkError|Load failed|network/i.test(msg) && !/\[\d{3}/.test(msg)) { var en = new Error(msg); en.red = true; throw en; }
           if (/429|quota|RESOURCE_EXHAUSTED/i.test(msg)) { hubo429 = true; marcarSinCupo(n, /per ?day|PerDay|daily/i.test(msg) ? 6 * 3600000 : 90000); errores.push(resumenError(n, msg)); break; }
           if (/404|not found|NOT_FOUND/i.test(msg)) { marcarSinCupo(n, 24 * 3600000); errores.push(resumenError(n, msg)); break; }
           if (!simple && /\[400/.test(msg)) continue; // probar sin la configuración de razonamiento
@@ -151,7 +153,7 @@
         catch (e) {
           var msg = String((e && e.message) || e);
           if (opts && opts.signal && opts.signal.aborted) throw { code: 'cancelled' };
-          throw { code: /429|quota|RESOURCE_EXHAUSTED/i.test(msg) ? 'rate_limited' : 'upstream_error', message: msg };
+          throw { code: e && e.red ? 'network' : /429|quota|RESOURCE_EXHAUSTED/i.test(msg) ? 'rate_limited' : 'upstream_error', message: e && e.red ? '' : msg };
         }
         if (opts && opts.signal && opts.signal.aborted) throw { code: 'cancelled' };
         var txt = r.response.text();
