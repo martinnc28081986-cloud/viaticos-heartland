@@ -653,6 +653,22 @@ $('otraFoto').onclick = function () { $('preview').classList.add('hide'); $('pic
 $('preview').onclick = function () { $('ovImg').src = this.src; $('overlay').classList.remove('hide'); };
 $('overlay').onclick = function () { this.classList.add('hide'); };
 
+// Acepta YYYY-MM-DD, DD/MM/YYYY, DD/MM/YY, DD/MM o "MM-DD" sin año; completa el año y no deja fechas en el futuro
+function normalizarFecha(f) {
+  if (!f) return null; f = String(f).trim();
+  var y, mo, d, m;
+  if ((m = f.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if ((m = f.match(/^(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?$/))) { d = +m[1]; mo = +m[2]; y = m[3] ? +m[3] : null; if (y && y < 100) y += 2000; }
+  else if ((m = f.match(/^-*(\d{1,2})-(\d{1,2})$/))) { mo = +m[1]; d = +m[2]; y = null; }
+  else return null;
+  if (mo > 12 && d <= 12) { var t = mo; mo = d; d = t; }
+  if (!(mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) return null;
+  var hoy = new Date(), sinAnio = !y;
+  if (sinAnio) y = hoy.getFullYear();
+  var iso = function () { return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0'); };
+  if (sinAnio && iso() > hoyISO()) y--;
+  return iso();
+}
 async function leerTicket() {
   if (!S.sample || !S.blob) { if (!S.sample) note($('readNote'), 'info', 'Completá los datos a mano.'); return; }
   if (S.readCtl) S.readCtl.abort();
@@ -663,6 +679,7 @@ async function leerTicket() {
   var prompt = 'La imagen es un ticket, factura o comprobante de pago (o captura de un pago, p. ej. TelePASE/peaje, estacionamiento, combustible, comida, hotel, taxi). ' +
     'Puede ser de Argentina o de otro país. Extraé los datos. En Argentina los importes usan punto para miles y coma para decimales ("98.450,00" = 98450.00). ' +
     'El importe es el TOTAL pagado (si hay varios movimientos, la suma). La moneda es la del comprobante: ARS si es de Argentina en pesos; si no, la que corresponda. ' +
+    'Hoy es ' + hoyISO() + '. Si la fecha no trae año (p. ej. "18 de noviembre" en capturas de Mercado Pago o del banco), usá el año actual, salvo que esa fecha quede en el futuro: en ese caso es del año anterior. Si hay varios movimientos de días distintos, usá la fecha más reciente. ' +
     'Las fechas argentinas van día/mes/año ("05/11/26" = 5 de noviembre de 2026), nunca mes/día. ' +
     'Buscá el total final ("TOTAL", "TOTAL A PAGAR", "IMPORTE TOTAL"); no uses subtotal, IVA, "SU PAGO", "EFECTIVO", "VUELTO", ni CUIT, CAE, número de comprobante o de punto de venta. ' +
     'El proveedor es el nombre comercial del local o la estación (no la razón social S.A./S.R.L. si hay nombre de fantasía). Si un dato no se lee con claridad, devolvé null en vez de adivinar. ' +
@@ -680,6 +697,7 @@ async function leerTicket() {
     }
     if (ctl.signal.aborted) return;
     var libre = function (id) { return !$(id).dataset.touched; }, leidos = [];
+    if (r) r.fecha = normalizarFecha(r.fecha);
     if (r && r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) { leidos.push('fecha'); if (libre('fFecha')) $('fFecha').value = r.fecha; }
     if (r && r.litros != null && Number(r.litros) > 0) { leidos.push('litros'); if (libre('fLitros')) $('fLitros').value = B.fmtNum(r.litros); }
     if (r && r.proveedor) { leidos.push('proveedor'); if (libre('fProv')) $('fProv').value = String(r.proveedor).slice(0, 80); }
