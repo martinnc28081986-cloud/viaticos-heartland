@@ -603,7 +603,9 @@ window.addEventListener('focus', alVolver); window.addEventListener('pageshow', 
 var camStream = null;
 function camaraNativa() { try { sessionStorage.setItem('camara', Date.now()); } catch (e) {} $('foto').click(); }
 async function abrirCamara() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { camaraNativa(); return; }
+  // En iPhone/iPad la cámara propia del sistema saca mejores fotos (y no cierra la app), así que se usa esa
+  var esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (esIOS || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { camaraNativa(); return; }
   try { camStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 2160 } } }); }
   catch (e) {
     if (e && e.name === 'NotAllowedError') note($('readNote'), 'warn', 'La app no tiene permiso para usar la cámara. Habilitalo en los permisos del sitio (candado junto a la dirección) o usá Galería.');
