@@ -73,7 +73,17 @@
     var ref = real ? FB.doc(fs, real) : null;
     return {
       id: path.split('/').pop(), path: path,
-      get: async function () { if (!ref) return { exists: false, data: function () {} }; return snapDoc(await FB.getDoc(ref)); },
+      // Primero lo guardado en el celular (instantáneo); si no está, espera al servidor
+      get: function () {
+        if (!ref) return Promise.resolve({ exists: false, data: function () {} });
+        return new Promise(function (ok) {
+          var listo = false, unsub = null;
+          function fin(s) { if (listo) return; listo = true; if (unsub) unsub(); ok(snapDoc(s)); }
+          unsub = FB.onSnapshot(ref, { includeMetadataChanges: true }, function (s) { if (s.exists() || !s.metadata.fromCache) fin(s); },
+            function () { if (!listo) { listo = true; if (unsub) unsub(); FB.getDoc(ref).then(function (s) { ok(snapDoc(s)); }, function () { ok({ exists: false, data: function () {} }); }); } });
+          if (listo && unsub) unsub();
+        });
+      },
       set: function (d) { return FB.setDoc(ref, d); },
       update: function (d) { return FB.updateDoc(ref, d); },
       delete: function () { return ref ? FB.deleteDoc(ref) : Promise.resolve(); },

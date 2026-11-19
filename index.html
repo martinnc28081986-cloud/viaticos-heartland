@@ -338,7 +338,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--tx2)}
 </div>
 
 <script src="fb.bundle.js?v=29"></script>
-<script src="shim.js?v=34"></script>
+<script src="shim.js?v=35"></script>
 <script src="builders.js?v=29"></script>
 <script>
 // Si algún archivo de la app no llegó a bajar (mala señal), reintentar solo una vez y si no, ofrecer el botón
@@ -961,13 +961,26 @@ async function guardarArchivo(btn, nombre, crear) {
   catch (e) { if (e && e.code === 'declined') note($('dlNote'), 'info', 'Descarga cancelada.'); else note($('dlNote'), 'err', 'No se pudo generar el archivo' + (e && e.message ? ': ' + esc(e.message) : '') + '.'); }
   finally { btn.disabled = false; btn.innerHTML = html; }
 }
+// Librerías pesadas del Excel y el Word: se bajan recién cuando hacen falta (o en segundo plano después de abrir)
+var libsCargando = {};
+function cargarScript(src) {
+  return libsCargando[src] || (libsCargando[src] = new Promise(function (ok, mal) {
+    var sc = document.createElement('script'); sc.src = src; sc.async = true;
+    sc.onload = function () { ok(); }; sc.onerror = function () { delete libsCargando[src]; mal(new Error('no se pudo descargar ' + src)); };
+    document.body.appendChild(sc);
+  }));
+}
+function libsExcel() { return Promise.all([cargarScript('plantilla.js'), cargarScript('exceljs.min.js')]); }
+function libsWord() { return cargarScript('docx.iife.js'); }
 async function crearXlsx() {
+  await libsExcel();
   if (!window.PLANTILLA_B64) throw new Error('no se cargó la plantilla');
   var bin = atob(window.PLANTILLA_B64), tpl = new Uint8Array(bin.length);
   for (var i = 0; i < bin.length; i++) tpl[i] = bin.charCodeAt(i);
   return new Blob([await B.buildXlsx(ExcelJS, tpl.buffer, datosExport())], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 async function crearDocx() {
+  await libsWord();
   var d = datosExport(), imgs = {};
   for (var i = 0; i < d.tickets.length; i++) {
     var t = d.tickets[i]; if (!t.assetId) continue;
@@ -1338,6 +1351,11 @@ function render() {
   $('cMotivo').value = 'REPRESENTACIÓN COMERCIAL';
   renderChips(); actualizarMoneda(); renderInicio();
 })();
+var libsPrecargadas = false;
+function precargarLibs() {
+  if (libsPrecargadas) return; libsPrecargadas = true;
+  setTimeout(function () { libsExcel().then(libsWord).catch(function () {}); }, 5000);
+}
 (async function init() {
   if (!window.claude || !window.claude.use) { $('boot').classList.add('hide'); note($('fatal'), 'err', 'Abrí esta app desde claude.ai para usarla.'); return; }
   var res = await Promise.all(['db', 'user', 'assets', 'sample', 'downloads'].map(function (n) { return claude.use(n).catch(function () { return null; }); }));
@@ -1368,14 +1386,12 @@ function render() {
     for (var k = 0; k < imp.docs.length; k++) { var dd = imp.docs[k]; await S.tkCol.doc(dd.id).set(dd.data()); await S.db.doc('importar/' + dd.id).delete(); }
   } catch (e) {}
   S.tkCol.onSnapshot(function (snap) {
-    if (!snap.metadata.fromCache) { clearTimeout(timer); $('boot').classList.add('hide'); }
+    // Con los datos guardados en el celular ya se puede usar la app; el servidor actualiza después
+    if (!snap.metadata.fromCache || snap.docs.length) { clearTimeout(timer); $('boot').classList.add('hide'); precargarLibs(); }
     S.tickets = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
     asegurarRendiciones(); render();
   }, function () { clearTimeout(timer); $('boot').classList.add('hide'); note($('fatal'), 'err', 'Se perdió la conexión con tus datos. Recargá la página.'); });
 })();
 </script>
-<script src="plantilla.js" defer></script>
-<script src="exceljs.min.js" defer></script>
-<script src="docx.iife.js" defer></script>
 </body>
 </html>
